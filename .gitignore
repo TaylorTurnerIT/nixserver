@@ -12,9 +12,10 @@
 !configuration.nix
 !disko-config.nix
 !flake.nix
+!flake.lock
 
 # Allow ALL in the containers folder
 !containers/**
 
-# SSH public key 
-!nixhomelab.pub
+# Add deployment scripts
+!deploy-nix.sh
