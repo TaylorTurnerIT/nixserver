@@ -1,0 +1,20 @@
+# THIS IS A WHITELIST GITIGNORE
+# ONLY LIST ITEMS TO INCLUDE IN GIT
+
+# Ignore everything by default
+*
+
+# Allow basic git files
+!.gitignore
+!README.md
+
+# Allow Nix files
+!configuration.nix
+!disko-config.nix
+!flake.nix
+
+# Allow ALL in the containers folder
+!containers/**
+
+# SSH public key 
+!nixhomelab.pub
