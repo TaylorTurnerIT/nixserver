@@ -45,7 +45,7 @@ in
       credentialsFile = "/var/lib/secrets/cloudflare_token";
       
       # Reload Caddy when certs change
-      postRun = "systemctl reload caddy";
+      postRun = "systemctl is-active caddy && systemctl reload caddy || true";
     };
   };
 
