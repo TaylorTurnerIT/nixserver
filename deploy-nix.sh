@@ -33,13 +33,14 @@ fi
 
 echo "🚀 Starting Deployment Container..."
 
-# We run the container with:
+# We run an ephemeral container with:
 # -v $(pwd):/work:Z       -> Mounts current folder. :Z fixes SELinux on Bazzite/Fedora.
 # -v $HOME/.ssh:...       -> Mounts your SSH keys so you can connect to the server.
 # --net=host              -> Uses host networking to avoid DNS/IP issues.
 podman run --rm -it \
   -v "$(pwd):/work:Z" \
   -v "$HOME/.ssh:/root/.ssh:ro" \
+  -v "$HOME/.ssh/config:/root/.ssh/config:ro" \
   -w /work \
   --net=host \
   nixos/nix \
