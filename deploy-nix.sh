@@ -31,6 +31,18 @@ elif [[ -n "$1" ]]; then
     usage
 fi
 
+# Check if running as root
+if [ "$EUID" -ne 0 ]; then
+    echo "This script requires sudo privileges."
+    echo "Please enter your password:"
+    
+    # Re-run the script with sudo
+    exec sudo "$0" "$@"
+fi
+
+# Script runs as root from here
+echo "Running with sudo privileges..."
+
 echo "🚀 Starting Deployment Container..."
 
 # We run an ephemeral container with:
