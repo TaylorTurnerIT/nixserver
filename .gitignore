@@ -15,7 +15,12 @@
 !flake.lock
 
 # Allow ALL in the containers folder
-!containers/**
+!containers/
+!containers/*.nix
+
+# Allow ALL in the network folder
+!network/
+!network/*.nix
 
 # Add deployment scripts
 !deploy-nix.sh

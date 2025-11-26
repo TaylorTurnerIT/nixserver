@@ -3,6 +3,9 @@
 {
   imports = [ 
     (modulesPath + "/profiles/qemu-guest.nix")
+    ./disko-config.nix
+    ./containers/default.nix
+    ./network/default.nix
   ];
 
   # --- BOOTLOADER ---
