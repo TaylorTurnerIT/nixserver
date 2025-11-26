@@ -88,12 +88,12 @@ in
       };
 
       /*
-        Service:  Homepage
+        Service:  Homepage (DEFAULT)
                   Homepage dashboard for quick access to services and status.
                   
-                  dashboard.tongatime.us -> http://localhost:3000
+                  tongatime.us -> http://localhost:3000
       */
-      "dashboard.${domain}" = {
+      "${domain}" = {
         useACMEHost = domain;
         extraConfig = "reverse_proxy localhost:3000";
       };
