@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 
 # --- Configuration ---
-TARGET_HOST="homelab" # Aliased in ~/.ssh/config
+TARGET_HOST="homelab" 
 FLAKE=".#homelab"
 # ---------------------
 
-set -e # Exit immediately if a command exits with a non-zero status.
+set -e
 
 # Function to print usage
 usage() {
@@ -31,45 +31,58 @@ elif [[ -n "$1" ]]; then
     usage
 fi
 
-# Check if running as root
-if [ "$EUID" -ne 0 ]; then
-    echo "This script requires sudo privileges."
-    echo "Please enter your password:"
-    
-    # Re-run the script with sudo
-    exec sudo "$0" "$@"
-fi
-
-# Script runs as root from here
-echo "Running with sudo privileges..."
-
 echo "🚀 Starting Deployment Container..."
 
-# We run an ephemeral container with:
-# -v $(pwd):/work:Z       -> Mounts current folder. :Z fixes SELinux on Bazzite/Fedora.
-# -v $HOME/.ssh:...       -> Mounts your SSH keys so you can connect to the server.
-# --net=host              -> Uses host networking to avoid DNS/IP issues.
+# CHANGE: We mount keys to /mnt/ssh_keys (RO) instead of directly to /root/.ssh
 podman run --rm -it \
+  --security-opt label=disable \
   -v "$(pwd):/work:Z" \
-  -v "$HOME/.ssh:/root/.ssh:ro" \
-  -v "$HOME/.ssh/config:/root/.ssh/config:ro" \
+  -v "$HOME/.ssh:/mnt/ssh_keys:ro" \
   -w /work \
   --net=host \
   nixos/nix \
   bash -c "
-    # 1. Configure Nix (Enable Flakes) inside the container
+    # 1. Setup Writable SSH Environment
+    # We copy keys from the read-only mount to the writable container home
+    mkdir -p /root/.ssh
+    cp -r /mnt/ssh_keys/* /root/.ssh/ 2>/dev/null || true
+    chmod 700 /root/.ssh
+    chmod 600 /root/.ssh/*
+    
+    # 2. Configure Nix
     mkdir -p ~/.config/nix
     echo 'experimental-features = nix-command flakes' >> ~/.config/nix/nix.conf
 
-    # 2. Execute the requested command
-    if [ \"$MODE\" == \"install\" ]; then
-        echo '🔥 Nuking and Installing NixOS...'
-        nix run github:nix-community/nixos-anywhere -- --flake $FLAKE $TARGET_HOST
-    else
-        echo '🔄 Updating Configuration...'
-        # FIX: Run nixos-rebuild via 'nix run' since it isn't installed in the container by default
-        nix run nixpkgs#nixos-rebuild -- switch --flake $FLAKE --target-host $TARGET_HOST --use-remote-sudo
-    fi
+    # 3. Configure SSH to ignore known_hosts collisions
+    export NIX_SSHOPTS='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+
+    # 4. Execute Command (With Retry Loop)
+    while true; do
+        if [ \"$MODE\" == \"install\" ]; then
+            echo '🔥 Nuking and Installing NixOS...'
+            # Note: We explicitly point to the copied config file
+            if nix run github:nix-community/nixos-anywhere -- --flake $FLAKE $TARGET_HOST; then
+                echo '✅ Installation Complete!'
+                break
+            fi
+        else
+            echo '🔄 Updating Configuration...'
+            if nix run nixpkgs#nixos-rebuild -- switch --flake $FLAKE --target-host $TARGET_HOST --use-remote-sudo; then
+                echo '✅ Update Complete!'
+                break
+            fi
+        fi
+
+        echo 
+        echo '❌ Command failed.'
+        read -p 'Retry? (y/N) ' -n 1 -r REPLY
+        echo
+        if [[ ! \$REPLY =~ ^[Yy]$ ]]; then
+            echo 'Exiting.'
+            exit 1
+        fi
+        echo '🔄 Retrying...'
+    done
 "
 
 echo "✅ Done!"
