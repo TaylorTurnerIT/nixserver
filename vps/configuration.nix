@@ -1,4 +1,4 @@
-{ config, pkgs, lib, ... }:
+{ config, pkgs, pkgs-unstable, lib, ... }:
 
 /*
     VPS Proxy Server Configuration
@@ -11,17 +11,19 @@
         - Caddy Layer 4 Proxy: Forward Minecraft traffic over Tailscale
     
     Decisions are documented per component.
+
+    Caddy requires unstable packages for plugin support, hence the use of pkgs-unstable.
 */
 {
   imports = [ 
     # Standard Oracle Cloud hardware support
-    (modulesPath + "/profiles/qemu-guest.nix")
+    # (modulesPath + "/profiles/qemu-guest.nix")
   ];
 
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
 
-  networking.hostName = "vps-gateway";
+  networking.hostName = "vps-proxy";
   networking.networkmanager.enable = true;
 
   # --- SECURITY HARDENING ---
@@ -67,10 +69,10 @@
   # --- CADDY LAYER 4 PROXY ---
   services.caddy = {
     enable = true;
-    # Build Caddy with the Layer 4 plugin
-    package = pkgs.caddy.withPlugins {
+    # Use unstable pkgs for Caddy with Layer 4 plugin
+    package = pkgs-unstable.caddy.withPlugins {
       plugins = [ "github.com/mholt/caddy-l4" ];
-      hash = lib.fakeSha256; # ⚠️ REPLACE THIS with the actual hash after first failed build
+      hash = lib.fakeSha256; 
     };
 
     # Global options
