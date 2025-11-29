@@ -18,8 +18,8 @@
       ];
     };
 
-    # Oracle VPS Gateway Configuration
-    nixosConfigurations.vps-gateway = nixpkgs.lib.nixosSystem {
+    # Oracle VPS Proxy Configuration
+    nixosConfigurations.vps-proxy = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
         disko.nixosModules.disko
