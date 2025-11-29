@@ -28,4 +28,5 @@
 !build-deployer.sh
 
 # Allow VPS proxy deployment script
-!vps_proxy
+!vps_proxy/
+!vps_proxy/deploy_vps.sh
