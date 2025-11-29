@@ -71,7 +71,7 @@
     enable = true;
     # Use unstable pkgs for Caddy with Layer 4 plugin
     package = pkgs-unstable.caddy.withPlugins {
-      plugins = [ "github.com/mholt/caddy-l4" ];
+      plugins = [ "github.com/mholt/caddy-l4@v0.0.0-20251124224044-66170bec9f4d" ];
       hash = lib.fakeSha256; 
     };
 
@@ -87,7 +87,7 @@
         :25565 {
           route {
             proxy {
-              # REPLACE with your Home Server's Tailscale IP
+              # Homelab's Tailscale IP
               upstream 100.73.119.72:25565 
             }
           }
