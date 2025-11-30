@@ -49,30 +49,36 @@ podman run --rm -it \
         \$SSH_CMD \"curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install --no-confirm\"
     fi
 
-    # --- 2. System Configuration (The Fixes) ---
+    # --- 2. System Configuration ---
     echo '🛡️ Configuring System & Security...'
     
     \$SSH_CMD \"
         set -e
-        # 1. Enable Lingering (so Caddy stays running)
+        # 1. Enable Lingering
         sudo loginctl enable-linger $TARGET_USER
 
-        # 2. Fix 'Lacks Signature' Error (Trust the ubuntu user)
-        if ! grep -q 'trusted-users =.*$TARGET_USER' /etc/nix/nix.conf; then
+        # 2. Fix 'Lacks Signature' Error
+        # We append the config if missing
+        if ! grep -q 'trusted-users = root $TARGET_USER' /etc/nix/nix.conf; then
             echo '🔓 Adding $TARGET_USER to trusted-users...'
             echo 'trusted-users = root $TARGET_USER' | sudo tee -a /etc/nix/nix.conf
-            sudo systemctl restart nix-daemon
         fi
 
-        # 3. Create 3GB Swap (The Requested Feature)
+        # CRITICAL FIX: Always restart daemon to ensure config is loaded
+        # (Even if the line already existed from a previous run)
+        echo '🔄 Restarting Nix Daemon...'
+        sudo systemctl restart nix-daemon
+
+        # 3. Swap Configuration
         if [ ! -f /swapfile ]; then
             echo '💾 Creating 3GB Swap File...'
             sudo fallocate -l 3G /swapfile
             sudo chmod 600 /swapfile
             sudo mkswap /swapfile
             sudo swapon /swapfile
-            # Make it persistent
-            echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+            if ! grep -q '/swapfile' /etc/fstab; then
+                echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+            fi
             echo '✅ Swap Active'
         else
             echo '✅ Swap already exists'
