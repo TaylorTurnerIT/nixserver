@@ -5,7 +5,7 @@ DEFAULT_HOST="vps-gateway"
 FLAKE=".#vps-proxy"
 DEPLOYER_IMAGE="homelab-deployer:latest"
 LOG_DIR="logs"
-SSH_KEY_NAME="homelab"  # <--- NEW: Define your specific key here
+SSH_KEY_NAME="homelab" 
 # ---------------------
 
 set -e
@@ -15,14 +15,12 @@ mkdir -p "$LOG_DIR"
 TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
 LOG_FILE="$LOG_DIR/deploy_vps_$TIMESTAMP.log"
 
-# --- NEW: Check for SSH Key locally before starting ---
+# Check for SSH Key locally
 if [[ ! -f "$HOME/.ssh/$SSH_KEY_NAME" ]]; then
     echo "❌ CRITICAL ERROR: SSH Key '$HOME/.ssh/$SSH_KEY_NAME' not found!"
     echo "   The deployment container needs this specific key to connect."
-    echo "   Please verify the key exists or update SSH_KEY_NAME in this script."
     exit 1
 fi
-# ------------------------------------------------------
 
 # Function to print usage
 usage() {
@@ -31,10 +29,6 @@ usage() {
     echo "  (no option)   Update the server (nixos-rebuild switch)"
     echo "  --install     Wipe and Re-install (nixos-anywhere)"
     echo "  --rebuild     Rebuild the deployment container"
-    echo ""
-    echo "Examples:"
-    echo "  $0                      (Updates vps-gateway)"
-    echo "  $0 --install 192.0.2.1  (Installs to IP using ubuntu user)"
     exit 1
 }
 
@@ -91,24 +85,29 @@ podman run --rm -it \
     # 1. Setup Writable SSH Environment
     mkdir -p /root/.ssh
     cp -r /mnt/ssh_keys/* /root/.ssh/ 2>/dev/null || true
+    
+    # FIX: SSH keys MUST have strict permissions or SSH ignores them
     chmod 700 /root/.ssh
     chmod 600 /root/.ssh/* 2>/dev/null || true
     
-    # Configure SSH to use SPECIFIC key
+    # Configure SSH Defaults
     echo 'Host $TARGET' >> /root/.ssh/config
     echo '    StrictHostKeyChecking no' >> /root/.ssh/config
     echo '    UserKnownHostsFile /dev/null' >> /root/.ssh/config
-    # Explicitly add the key passed from the host script
+    # Note: We still add this to config, but we ALSO pass it via CLI below
     echo '    IdentityFile /root/.ssh/$SSH_KEY_NAME' >> /root/.ssh/config
 
-    # 2. Execute Command (With Retry Loop)
+    # 2. Execute Command
     while true; do
         if [ \"\$MODE\" == \"install\" ]; then
             echo '🔥 Nuking and Installing NixOS on $TARGET...'
             
+            # FIX: We explicitly pass the IdentityFile via --ssh-option
+            # This ensures ssh-copy-id (which nixos-anywhere calls) uses the right key
             if nixos-anywhere \
                 --flake \"\$FLAKE\" \
                 --build-on remote \
+                --ssh-option \"IdentityFile=/root/.ssh/\$SSH_KEY_NAME\" \
                 ubuntu@\"\$TARGET\"; then
                 
                 echo '✅ Installation Complete!'
@@ -117,10 +116,13 @@ podman run --rm -it \
         else
             echo '🔄 Updating Configuration on $TARGET...'
             
+            # FIX: Also pass identity file to rebuild switch
+            # -N = no config file (prevents conflicts), but we use config for HostName
             if nixos-rebuild switch \
                 --flake \"\$FLAKE\" \
                 --target-host \"root@\$TARGET\" \
-                --use-remote-sudo; then
+                --use-remote-sudo \
+                --option \"IdentityFile=/root/.ssh/\$SSH_KEY_NAME\"; then
                 
                 echo '✅ Update Complete!'
                 break
