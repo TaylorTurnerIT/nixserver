@@ -1,7 +1,7 @@
 { config, pkgs, ... }:
 
 {
-    config.virtualisation.oci-containers.minecraft = {
+    config.virtualisation.oci-containers.containers.minecraft = {
         /*
             Minecraft Server Container
             This container runs a Minecraft server using the itzg/minecraft-server image.
@@ -27,6 +27,9 @@
 
             Reference:
             https://setupmc.com/java-server/
+
+            ### NOTE:
+            This is running root, this will need to be changed to a non-root user for security.
         */
         image = "itzg/minecraft-server:latest";
         autoStart = true;
@@ -61,7 +64,13 @@
         RCON_CMDS_FIRST_CONNECT = "pregen stop";
         RCON_CMDS_LAST_DISCONNECT = "pregen start 200";
         };
-    }
+    };
+
+    # Ensure the Minecraft data directory exists with correct permissions
+    # 07551 = drwxr-xr-x, 1000 = uid for 'minecraft' user, 1000 = gid for 'minecraft' group
+    systemd.tmpfiles.rules = [
+    "d /var/lib/minecraft 0755 1000 1000 - -"
+  ];
 }
 
 
