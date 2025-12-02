@@ -3,8 +3,8 @@
 > **A fully declarative, immutable infrastructure stack for self-hosting services, utilizing a hybrid architecture of NixOS and Nix-on-Ubuntu.**
 
 ![Nix](https://img.shields.io/badge/Nix-Reproducible_Builds-5277C3?style=for-the-badge&logo=nixos&logoColor=white) ![Home Manager](https://img.shields.io/badge/Home_Manager-Enabled-5277C3?style=for-the-badge&logo=nixos&logoColor=white)
-![Oracle Cloud](https://img.shields.io/badge/Oracle_Cloud-F80000?style=for-the-badge&logo=oracle&logoColor=white)![Ubuntu](https://img.shields.io/badge/Ubuntu-E95420?style=for-the-badge&logo=ubuntu&logoColor=white) ![Tailscale](https://img.shields.io/badge/Tailscale-Mesh_VPN-orange?style=for-the-badge&logo=tailscale&logoColor=white)
 ![Podman](https://img.shields.io/badge/Podman-OCI_Containers-892CA0?style=for-the-badge&logo=podman&logoColor=white) ![Caddy](https://img.shields.io/badge/Caddy-Layer_4_Proxy-green?style=for-the-badge&logo=caddy&logoColor=white) ![Minecraft](https://img.shields.io/badge/Minecraft-Java_Edition-green?style=for-the-badge&logo=minecraft&logoColor=white)
+![Oracle Cloud](https://img.shields.io/badge/Oracle_Cloud-F80000?style=for-the-badge&logo=oracle&logoColor=white)![Ubuntu](https://img.shields.io/badge/Ubuntu-E95420?style=for-the-badge&logo=ubuntu&logoColor=white) ![Tailscale](https://img.shields.io/badge/Tailscale-Mesh_VPN-orange?style=for-the-badge&logo=tailscale&logoColor=white)
 ## Overview
 
 This repository contains the Infrastructure as Code (IaC) configuration for the **Tonga** homelab and its public-facing gateway. The core philosophy of this project is **strict reproducibility**. By leveraging Nix flakes, every component of the server—from the partition tables to the Minecraft server settings—is defined in code.
