@@ -1,4 +1,4 @@
-# ❄️ TongaTime NixLab
+# ❄️ Tonga NixLab
 
 > **A fully declarative, immutable infrastructure stack for self-hosting services, utilizing a hybrid architecture of NixOS and Nix-on-Ubuntu.**
 
