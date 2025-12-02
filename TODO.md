@@ -3,7 +3,7 @@
 - [ ] **sops-nix**
       Secret management declaratively
 
-- [ ] **cloudflared**
+- [ ] **Declarative DNS**
       Replace manual cloudflare DNS configuration with declarative configuration
 
 - [ ] **Replace ubuntu-based proxy with purely declarative nixos**
