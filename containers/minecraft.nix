@@ -50,7 +50,7 @@
         MEMORY = "6G";
         MAX_PLAYERS = "8";
         MOTD = ''§6✦ §l§6TONGA§eTIME§r §6✦ §r§7tongatime.us §b▸ §fIs it Tonga Time?§7§o[1.20+]'';
-        ICON = "https://icons.iconarchive.com/icons/chrisl21/minecraft/48/Computer-icon.png";
+        ICON = "https://icons.iconarchive.com/icons/chrisl21/minecraft/128/Computer-icon.png";
         USE_MEOWICE_FLAGS = "true"; 
         DIFFICULTY = "2";
         PVP = "false";
@@ -60,11 +60,6 @@
         OPS = "NVMGamer";
         ENABLE_WHITELIST = "true";
         WHITELIST = "NVMGamer";
-        
-        # RCON Commands
-        RCON_CMDS_STARTUP = "pregen start 200";
-        RCON_CMDS_FIRST_CONNECT = "pregen stop";
-        RCON_CMDS_LAST_DISCONNECT = "pregen start 200";
         };
     };
 
