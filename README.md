@@ -140,10 +140,9 @@ To bootstrap or update the gateway:
 
 ## 🗺️ Roadmap
 
-  * [ ] **Secret Management:** Implement `sops-nix` for encrypted secret storage.
-  * [ ] **Declarative DNS:** Move Cloudflare DNS records into Terraform or Nix.
-  * [ ] **Full Migration:** Replace Ubuntu VPS with purely declarative NixOS (investigating `kexec` solutions).
-  * [ ] **Storage:** Migrate volumes to NAS and setup Jellyfin.
+Future plans, including secret management updates and storage migrations, are documented in the project TODOs.
+
+👉 **See [TODO.md](https://github.com/TaylorTurnerIT/nixserver/blob/master/README.md) for the full roadmap.**
 
 -----
 
