@@ -140,7 +140,7 @@ To bootstrap or update the gateway:
 
 ## 🗺️ Roadmap
 
-Future plans, including secret management updates and storage migrations, are documented in the project TODOs.
+Future plans are documented in the project TODOs.
 
 👉 **See [TODO.md](https://github.com/TaylorTurnerIT/nixserver/blob/master/README.md) for the full roadmap.**
 
