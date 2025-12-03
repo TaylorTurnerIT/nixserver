@@ -58,7 +58,7 @@ flowchart LR
 
 Instead of exposing the home IP, an Oracle VPS acts as a shield.
 
-  * **Caddy L4 Proxy:** Uses `caddy-l4` to proxy raw TCP traffic (Minecraft) over Tailscale.
+  * **Caddy L4 Proxy:** Uses `caddy-l4` to proxy raw TCP traffic  over Tailscale.
   * **Tailscale Mesh:** The VPS and Homelab communicate over an encrypted WireGuard mesh. The VPS bans malicious IPs via **Fail2Ban** but whitelists the Tailscale subnet (`100.0.0.0/8`).
 
 ### ❄️ Declarative Services
