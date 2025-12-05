@@ -4,13 +4,10 @@ set -e
 # --- Configuration ---
 DEPLOYER_IMAGE="homelab-deployer:latest"
 SECRETS_FILE="secrets/secrets.yaml"
+ZONES_FILE="network/dns_zones.enc.yaml"
 # ---------------------
 
-# Check for Sops
-if ! command -v sops &> /dev/null; then
-    echo "❌ Error: 'sops' is not installed on your host. Please install it to decrypt secrets."
-    exit 1
-fi
+echo "🚀 Starting DNS Deployment..."
 
 # Check for Deployer Image
 if ! podman image exists "$DEPLOYER_IMAGE"; then
@@ -18,25 +15,33 @@ if ! podman image exists "$DEPLOYER_IMAGE"; then
     exit 1
 fi
 
-# Extract Cloudflare Token
-# We extract the token directly to a variable to avoid writing it to disk
-echo "lf Decrypting Cloudflare Token..."
-export CF_TOKEN=$(sops -d --extract '["cloudflare_token"]' "$SECRETS_FILE")
-
-if [ -z "$CF_TOKEN" ]; then
-    echo "❌ Failed to extract 'cloudflare_token' from $SECRETS_FILE"
+# Extract Cloudflare Token (On Host)
+echo "🔓 Decrypting Cloudflare Token..."
+# Check if sops is available on host, otherwise warn user
+if command -v sops &> /dev/null; then
+    export CF_TOKEN=$(sops -d --extract '["cloudflare_token"]' "$SECRETS_FILE")
+else
+    echo "❌ 'sops' not found on host. Cannot decrypt token."
     exit 1
 fi
 
-# Run DNSControl
-echo "🚀 Running DNSControl Container..."
+# Run Container with In-Memory Decryption
 podman run --rm -it \
   --security-opt label=disable \
   -v "$(pwd):/work:Z" \
+  -v "$HOME/.ssh:/root/.ssh:ro" \
+  -v "$HOME/.config/sops:/root/.config/sops:ro" \
   -w /work \
   -e CLOUDFLARE_API_TOKEN="$CF_TOKEN" \
   "$DEPLOYER_IMAGE" \
   bash -c "
+    set -e
+    
+    echo '🔓 Decrypting Zones YAML in memory...'
+    # Decrypt YAML -> Convert to JSON -> Store in ENV
+    # This pipeline ensures plaintext never touches the disk
+    export DNS_ZONES_JSON=\$(sops -d \"$ZONES_FILE\" | yq -o=json)
+
     echo '🔍 Checking Configuration...'
     dnscontrol check --creds network/creds.json --config network/dnsconfig.js
 
