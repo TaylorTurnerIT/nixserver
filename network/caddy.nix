@@ -92,8 +92,8 @@ in
       */
       "${domain}" = {
         useACMEHost = domain;
-        # We use http because the container listens on plain http internally.
-        extraConfig = "reverse_proxy http://192.168.1.36:3000";
+        # Use 127.0.0.1 to communicate internally and bypass the firewall
+        extraConfig = "reverse_proxy http://127.0.0.1:3000";
       };
 
     };
