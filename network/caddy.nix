@@ -37,14 +37,11 @@ in
   security.acme = {
     acceptTerms = true;
     defaults.email = email;
-    
     certs."${domain}" = {
-      domain = "*.${domain}"; # Wildcard cert for all subdomains
+      domain = domain;                      # Main domain (tongatime.us)
+      extraDomainNames = [ "*.${domain}" ]; # Wildcard (*.tongatime.us)
       dnsProvider = "cloudflare";
-      # We load the token from a file (we will create this manually)
       credentialsFile = config.sops.secrets.cloudflare_token.path;
-      
-      # Reload Caddy when certs change
       postRun = "systemctl is-active caddy && systemctl reload caddy || true";
     };
   };
