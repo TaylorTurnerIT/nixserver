@@ -21,6 +21,7 @@
 # Allow ALL in the network folder
 !network/
 !network/*.nix
+!network/dnsconfig.js
 
 # Allow deployment files
 !deploy-nix.sh
