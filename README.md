@@ -146,6 +146,7 @@ To bootstrap or update the gateway:
 *This script will SSH into the Ubuntu host, install the Nix package manager if missing, configure multi-user support, and apply the `homeConfigurations."ubuntu"` flake output.*
 
 ## 🗺️ Roadmap
+> "Debugging is twice as hard as writing the code in the first place. Therefore, if you write the code as cleverly as possible, you are, by definition, not smart enough to debug it." - Brian Kernighan, Canadian
 
 Future plans are documented in the project TODOs.
 
