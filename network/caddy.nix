@@ -42,7 +42,7 @@ in
       domain = "*.${domain}"; # Wildcard cert for all subdomains
       dnsProvider = "cloudflare";
       # We load the token from a file (we will create this manually)
-      credentialsFile = config.sops.secrets.cloudflare_token.path;
+      credentialsFile = config.sops.secrets.acme_cloudflare_token.path;
       
       # Reload Caddy when certs change
       postRun = "systemctl is-active caddy && systemctl reload caddy || true";
