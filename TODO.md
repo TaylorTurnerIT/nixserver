@@ -27,3 +27,5 @@
 - [ ] **Setup Jellyfin**
 
 - [ ] **Convert all containers to run rootless**
+
+- [ ] **Integrate Jexpanel as a centralized game server management platform.**
