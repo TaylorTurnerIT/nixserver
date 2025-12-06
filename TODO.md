@@ -34,7 +34,7 @@
 
 - [ ] **Enforce image pinning for further reproducibility**
 
-- [ ] **Create an update tracker for container images, security updates, etc.**
+- [ ] **Add Renovate Bot to monitor images for updates and automate update PRs**
 
 - [ ] **Research nix-test to further verify builds before deployment**
 
