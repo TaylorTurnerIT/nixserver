@@ -39,6 +39,7 @@ flowchart LR
         TS_Home[Tailscale Interface]
         Podman[Podman OCI Backend]
         MC[Minecraft Container]
+        Homepage[Homepage Dashboard]
         CaddyRev[Caddy Reverse Proxy]
     end
 
@@ -47,10 +48,19 @@ flowchart LR
     CaddyL4 -->|Proxy via 100.x.y.z| TS_VPS
     TS_VPS -.->|Encrypted Tunnel| TS_Home
     TS_Home --> MC
+    CaddyRev --> Homepage
     
     style VPS fill:#e1f5fe,stroke:#01579b
     style Home fill:#f3e5f5,stroke:#4a148c
 ```
+
+## 🖥️ Services
+
+The homelab currently hosts:
+
+  * **Homepage** (`tongatime.us`) - Service dashboard with container monitoring
+  * **Minecraft** (`mc.tongatime.us`) - Java Edition server (whitelisted)
+  * **Proxmox** (`proxmox.tongatime.us`) - Hypervisor management interface
 
 ## Key Features
 
@@ -65,6 +75,7 @@ Instead of exposing the home IP, an Oracle VPS acts as a shield.
 
 Services are defined in Nix, ensuring that `rebuild switch` brings the system to the exact desired state.
 
+  * **Homepage:** A centralized dashboard at the root domain providing service monitoring and quick access. Integrated with the Docker socket to display real-time container status.
   * **Minecraft:** Configured via `virtualisation.oci-containers`. The entire server state, including hardware configuration, Message of the Day (MOTD), and whitelist, is version controlled.
   * **Reverse Proxy:** Caddy handles internal HTTPS with automatic ACME DNS challenges via Cloudflare, enabling wildcard certs (`*.tongatime.us`) without opening ports.
 
@@ -84,6 +95,9 @@ To solve the "it works on my machine" problem for deployment, the deployer itsel
 | **OS (Home)** | NixOS 24.11 | Pure, immutable Linux distribution. |
 | **OS (VPS)** | Ubuntu + Home Manager | Declarative user configuration on traditional Linux. |
 | **Containers** | Podman | Daemonless container engine (Docker compatible). |
+| **Dashboard** | Homepage | Service monitoring and management dashboard. |
+| **DNS** | DNSControl | Declarative DNS zone management for Cloudflare. |
+| **Secrets** | sops-nix | Encrypted secret storage in version control. |
 | **Storage** | Disko | Declarative disk partitioning and formatting. |
 | **Networking** | Tailscale | Mesh VPN for secure internal communication. |
 | **Proxy** | Caddy | Web server with Layer 4 and Reverse Proxy capabilities. |
@@ -97,14 +111,20 @@ To solve the "it works on my machine" problem for deployment, the deployer itsel
 ├── Containerfile         # Definition of the reproducible deployer image
 ├── containers/           # Service definitions (Podman)
 │   ├── default.nix       # Imports active containers
+│   ├── homepage.nix      # Homepage dashboard OCI config
 │   └── minecraft.nix     # Minecraft server OCI config
+├── deploy-dns.sh         # Script to deploy DNS changes
 ├── deploy-nix.sh         # Script to deploy to Homelab
 ├── deploy-vps.sh         # Script to bootstrap and deploy to VPS
 ├── disko-config.nix      # ZFS/EXT4 partition layouts
 ├── flake.nix             # Entry point for system configurations
 ├── network/              # Networking configuration
 │   ├── caddy.nix         # Reverse proxy & ACME settings
+│   ├── dnsconfig.js      # DNSControl configuration
+│   ├── dns_zones.yaml    # Declarative DNS zones
 │   └── tailscale.nix     # VPN configuration
+├── secrets/              # Encrypted secrets (sops-nix)
+│   └── secrets.yaml
 └── vps/                  # VPS-specific configuration
     ├── home.nix          # Home Manager config for Ubuntu
     └── configuration.nix # Partial system config
@@ -144,6 +164,17 @@ To bootstrap or update the gateway:
 ```
 
 *This script will SSH into the Ubuntu host, install the Nix package manager if missing, configure multi-user support, and apply the `homeConfigurations."ubuntu"` flake output.*
+
+### 4\. Managing DNS Records
+
+To update DNS records declaratively:
+
+```bash
+./deploy-dns.sh          # Preview and push DNS changes
+./deploy-dns.sh --revert backups/dns_zones_TIMESTAMP.yaml  # Revert to backup
+```
+
+*This script uses DNSControl to manage Cloudflare DNS zones from `network/dns_zones.yaml`. All changes are previewed before being applied.*
 
 ## 🗺️ Roadmap
 > "Debugging is twice as hard as writing the code in the first place. Therefore, if you write the code as cleverly as possible, you are, by definition, not smart enough to debug it." - Brian Kernighan, Canadian
