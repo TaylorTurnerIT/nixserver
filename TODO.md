@@ -53,3 +53,7 @@
 - [ ] **Add policy enforcement for container parameters**
 
 - [ ] **Research Identity and Access Management with Service Portal using Authentik**
+
+- [ ] **Create a website that shows off the homelab and its infrastructure as a realtime experience**
+
+- [ ] **Implement load balancing on the website to spin up and spin down new containers**
