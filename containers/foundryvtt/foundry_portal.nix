@@ -8,19 +8,19 @@ let
         instances = [
             {
                 name = "Chef's Games";
-                url = "http://127.0.0.1:30001/chef";
+                url = "https://foundry.tongatime.us/chef";
             }
             # {
             #     name = "Crunch's Games";
-            #     url = "http://127.0.0.1:30002/crunch";
+            #     url = "https://foundry.tongatime.us/crunch";
             # }
             # {
             #     name = "ColossusDirge's Games";
-            #     url = "http://127.0.0.1:30003/colossusdirge";
+            #     url = "https://foundry.tongatime.us/colossusdirge";
             # }
             # {
             #     name = "Laz's Games";
-            #     url = "http://127.0.0.1:30004/laz";
+            #     url = "https://foundry.tongatime.us/laz";
             # }
         ];
     };
