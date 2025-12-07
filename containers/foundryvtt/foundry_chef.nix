@@ -1,7 +1,7 @@
 { config, pkgs, ... }:
 
 {
-    virtualisation.oci-containers.containers.foundryvtt = {
+    virtualisation.oci-containers.containers.foundry_chef = {
         # Container image
         image = "felddy/foundryvtt:13";
         
@@ -9,11 +9,12 @@
         autoStart = true;
         
         # Map ports: Host:Container
-        ports = [ "30001:30001" ];
+        ports = [ "30001:30000" ];
 
         # Persistent Storage
         volumes = [
-            "/var/lib/foundry/chef:/app/data"
+            "/var/lib/foundry/chef:/data"
+            "${config.sops.templates."foundry_secrets.json".path}:/run/secrets/config.json:ro"
         ];
 
         # Environment Variables

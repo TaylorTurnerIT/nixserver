@@ -11,6 +11,7 @@
     ./homepage.nix
     ./minecraft.nix
     ./foundryvtt/foundry_portal.nix
+    ./foundryvtt/foundryvtt.nix
   ];
 
   # Global Podman Configuration

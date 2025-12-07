@@ -45,6 +45,23 @@
   sops.secrets.foundry_admin_hash = {
     owner = "root"; # Podman runs as root by default
   };
+  # --- Secrets for Foundry VTT ---
+  sops.secrets.foundry_username = {};
+  sops.secrets.foundry_password = {};
+  sops.secrets.foundry_admin_pass = {};
+
+  # Create the config.json template for the container
+  sops.templates."foundry_secrets.json" = {
+    content = ''
+      {
+        "${config.sops.placeholder.foundry_username}",
+        "${config.sops.placeholder.foundry_password}",
+        "${config.sops.placeholder.foundry_admin_pass}"
+      }
+    '';
+    # Restart the container if secrets change
+    owner = "root"; 
+  };
 
   # users.users.nixos.openssh.authorizedKeys.keys = [
   #   # Public Keys default nixos user
