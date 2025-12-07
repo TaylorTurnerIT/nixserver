@@ -54,12 +54,12 @@
   sops.templates."foundry_secrets.json" = {
     content = ''
       {
-        "FOUNDRY_USERNAME":"${config.sops.placeholder.foundry_username}",
-        "FOUNDRY_PASSWORD":"${config.sops.placeholder.foundry_password}",
-        "FOUNDRY_ADMIN_PASS":"${config.sops.placeholder.foundry_admin_pass}"
+        "foundry_username": "${config.sops.placeholder.foundry_username}",
+        "foundry_password": "${config.sops.placeholder.foundry_password}",
+        "foundry_admin_key": "${config.sops.placeholder.foundry_admin_pass}"
       }
     '';
-    mode = "0444";
+    mode = "0444"; 
   };
 
   # users.users.nixos.openssh.authorizedKeys.keys = [
