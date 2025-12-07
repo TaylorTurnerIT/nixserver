@@ -77,6 +77,7 @@ in {
     grafana = {
       image = "grafana/grafana:latest";
       autoStart = true;
+      extraOptions = [ "--network=host" ];
       ports = [ "3010:3000" ]; # Port 3000 is taken by Homepage
       volumes = [
         "grafana-storage:/var/lib/grafana"
@@ -92,6 +93,7 @@ in {
     prometheus = {
       image = "prom/prometheus:latest";
       autoStart = true;
+      extraOptions = [ "--network=host" ];
       ports = [ "9090:9090" ];
       volumes = [
         "${prometheusConfig}:/etc/prometheus/prometheus.yml:ro"
@@ -104,6 +106,7 @@ in {
     loki = {
       image = "grafana/loki:latest";
       autoStart = true;
+      extraOptions = [ "--network=host" ];
       ports = [ "3100:3100" ];
       volumes = [
         "${lokiConfig}:/etc/loki/local-config.yaml:ro"
@@ -116,6 +119,7 @@ in {
     promtail = {
       image = "grafana/promtail:latest";
       autoStart = true;
+      extraOptions = [ "--network=host" ];
       ports = [ "9080:9080" ];
       volumes = [
         "${promtailConfig}:/etc/promtail/config.yml:ro"
@@ -128,6 +132,7 @@ in {
     node-exporter = {
       image = "prom/node-exporter:latest";
       autoStart = true;
+      extraOptions = [ "--network=host" ];
       ports = [ "9100:9100" ];
       volumes = [
         "/proc:/host/proc:ro"
