@@ -65,10 +65,18 @@ let
         ];
 
         # Overwrite startup command to install config
+        # Runtime Injection
+        # 1. Copy config
+        # 2. Python script: Load yaml -> Read secret -> Inject hash -> Save yaml
+        # 3. Run app
         cmd = [ 
             "/bin/sh" 
             "-c" 
-            "cp /app/config_declarative.yaml /app/config.yaml && python app.py" 
+            ''
+                cp /app/config_declarative.yaml /app/config.yaml && \
+                python -c "import yaml; conf=yaml.safe_load(open('/app/config.yaml')); conf['admin_password_hash']=open('/run/secrets/foundry_admin_hash').read().strip(); yaml.dump(conf, open('/app/config.yaml','w'))" && \
+                python app.py
+            ''
         ];
     };
 
