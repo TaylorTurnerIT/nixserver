@@ -1,5 +1,26 @@
 { config, pkgs, ... }:
 
+let
+  # --- Configuration ---
+  # Define your portal configuration here using Nix syntax.
+  # This will be converted to the required config.yaml automatically.
+  portalConfig = {
+    shared_data_mode = false;
+    instances = [
+      {
+        name = "In Golden Flame";
+        url = "https://foundry.tongatime.us/crunch/ingoldenflame"; # Example URL
+      }
+      {
+        name = "Genesis";
+        url = "https://foundry.tongatime.us/chef/genesis";        # Example URL
+      }
+    ];
+  };
+
+  # Generate the configuration file in the Nix Store.
+  configYaml = pkgs.writeText "foundry-portal-config.yaml" (builtins.toJSON portalConfig);
+in
 {
     virtualisation.oci-containers.containers.foundry-portal = {
         /*
@@ -44,7 +65,7 @@
 
         # Persistent Storage - mount config file
         volumes = [
-            "/var/lib/foundry-portal/config.yaml:/app/config.yaml:ro"
+            "${configYaml}:/app/config.yaml:ro"
         ];
     };
 
