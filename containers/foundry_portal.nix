@@ -62,6 +62,7 @@ let
 
         volumes = [
             "${configYaml}:/app/config_declarative.yaml:ro"
+            "${config.sops.secrets.foundry_admin_hash.path}:/run/secrets/foundry_admin_hash:ro"
         ];
 
         # Overwrite startup command to install config
