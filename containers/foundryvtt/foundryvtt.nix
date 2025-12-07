@@ -1,7 +1,7 @@
 { config, pkgs, ... }:
 
 {
-    virtualisation.oci-containers.containers.homepage = {
+    virtualisation.oci-containers.containers.foundryvtt = {
         # Container image
         image = "felddy/foundryvtt:13";
         
@@ -34,7 +34,8 @@
             # Foundry optimizations 
             FOUNDRY_COMPRESS_WEBSOCKET = "true"
             FOUNDRY
-    };
+            };
+        };
 }
 
 
