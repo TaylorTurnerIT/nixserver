@@ -61,3 +61,5 @@
 - [ ] **Research projects to practice for the CKA**
 
 - [ ] **Create a centralized game management platform like Molten or ForgeVTT for FoundryVTT**
+
+- [ ] **Remove all host networking patches and replace with pod-based networking**
