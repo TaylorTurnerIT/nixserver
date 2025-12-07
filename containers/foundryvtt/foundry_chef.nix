@@ -39,6 +39,7 @@
         systemd.tmpfiles.rules = [
             "d /var/lib/foundry/chef 0755 1000 1000 - -"
             "d /run/secrets 0755 1000 1000 - -"
+            "f /run/secrets/config.json 0644 1000 1000 - -"
         ];
 }
 
