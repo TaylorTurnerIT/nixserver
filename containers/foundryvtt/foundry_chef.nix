@@ -25,7 +25,7 @@
             # Proxy settings
             FOUNDRY_IP_DISCOVERY = "false";
             FOUNDRY_HOSTNAME = "foundry.tongatime.us";
-            FOUNDRY_ROUTE_PREFIX = "/chef";
+            FOUNDRY_ROUTE_PREFIX = "chef";
             FOUNDRY_PROXY_SSL = "true";
             FOUNDRY_PROXY_PORT = "443";
             
