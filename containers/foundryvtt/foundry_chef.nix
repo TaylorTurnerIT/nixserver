@@ -31,6 +31,7 @@
             
             # Foundry optimizations 
             FOUNDRY_COMPRESS_WEBSOCKET = "true";
+            FOUNDRY_MINIFY_STATIC_FILES = "true";
         };
 
         };
