@@ -29,7 +29,12 @@
             
             # Foundry optimizations 
             FOUNDRY_COMPRESS_WEBSOCKET = "true";
-            };
+        };
+
+        # Ensure the container's data directory exists with proper permissions
+        systemd.tmpfiles.rules = [
+            "d /var/lib/foundry/chef 0755 root root - -"
+        ];
         };
 }
 
