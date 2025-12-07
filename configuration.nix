@@ -59,8 +59,7 @@
         "${config.sops.placeholder.foundry_admin_pass}"
       }
     '';
-    # Restart the container if secrets change
-    owner = "root"; 
+    owner = "1000"; 
   };
 
   # users.users.nixos.openssh.authorizedKeys.keys = [
