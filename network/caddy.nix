@@ -86,7 +86,7 @@ in
 
       "foundry.${domain}" = {
         useACMEHost = domain;
-        extraConfig = "reverse_proxy http://192.168.1.36:5000";
+        extraConfig = "reverse_proxy http://127.0.0.1:5000";
       };
 
       /* DEFAULT
