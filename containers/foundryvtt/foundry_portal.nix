@@ -34,6 +34,10 @@ let
     # This service ensures the image exists before the container starts.
     systemd.services.build-foundry-portal = {
         description = "Build Foundry Portal Docker Image";
+
+        wants = [ "network-online.target" ];
+        after = [ "network-online.target" ];
+
         path = [ pkgs.git pkgs.podman ]; # Tools needed for the script
         script = ''
         set -e
