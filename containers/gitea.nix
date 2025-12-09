@@ -17,7 +17,11 @@
     autoStart = true;
 
     # Port mapping: Host:Container
-    ports = [ "3001:3000" ];
+    ports = [ 
+      "3001:3000" # Gitea web interface
+      "2222:22"     # SSH for Git operations
+       ];
+    
 
     # Persistent storage - all Gitea data
     volumes = [
