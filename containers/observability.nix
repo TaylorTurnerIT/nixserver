@@ -27,6 +27,8 @@ let
     auth_enabled: false
     server:
       http_listen_port: 3100
+    limits_config:
+      allow_structured_metadata: false
     common:
       path_prefix: /loki
       storage:
