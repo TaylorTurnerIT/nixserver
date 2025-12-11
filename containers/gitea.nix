@@ -19,6 +19,7 @@
     # Port mapping: Host:Container
     ports = [ 
       "3001:3000" # Gitea web interface
+      "2222:22"   # SSH access for Git
        ];
     
 
@@ -43,6 +44,11 @@
       GITEA__server__DOMAIN = "git.tongatime.us";
       GITEA__server__ROOT_URL = "https://git.tongatime.us/";
       GITEA__server__HTTP_PORT = "3000";
+
+      # SSH configuration
+      GITEA__server__SSH_DOMAIN = "git.tongatime.us";
+      GITEA__server__SSH_PORT = "22";
+      GITEA__server__START_SSH_SERVER = "false";
 
       # Security
       GITEA__security__INSTALL_LOCK = "true";
