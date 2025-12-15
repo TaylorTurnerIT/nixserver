@@ -77,6 +77,7 @@
 
 	# Generate the .env file that the container will mount
 	sops.templates."jexactyl.env" = {
+		mode = "0444"; # Allow read-only
 		content = ''
 			APP_ENV=production
 			APP_DEBUG=false
