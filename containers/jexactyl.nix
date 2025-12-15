@@ -2,6 +2,8 @@
 
 let
   user = "jexactyl";
+  group = "users";
+  uid = 1001; 
   dataDir = "/var/lib/jexactyl";
 in {
 	# --- Secrets ---
@@ -18,7 +20,24 @@ in {
 		linger = true; # Keeps the rootless socket alive
 		home = dataDir;
 		createHome = true;
+		uid = uid; # Explicit UID required for string interpolation
 	};
+
+	# --- Data Directories ---
+	systemd.tmpfiles.rules = [
+		"d ${dataDir}/wings         0755 ${user} ${group} - -"
+		"d ${dataDir}/wings/config  0755 ${user} ${group} - -"
+		"d ${dataDir}/wings/data    0755 ${user} ${group} - -"
+		"d ${dataDir}/wings/backups 0755 ${user} ${group} - -"
+		
+		"d ${dataDir}/panel         0755 ${user} ${group} - -"
+		"d ${dataDir}/panel/var     0755 ${user} ${group} - -"
+		"d ${dataDir}/panel/logs    0755 ${user} ${group} - -"
+		"d ${dataDir}/panel/nginx   0755 ${user} ${group} - -"
+		
+		"d ${dataDir}/database      0755 ${user} ${group} - -"
+		"d ${dataDir}/redis         0755 ${user} ${group} - -"
+  	];
 
 	# --- Panel Environment Secrets ---
 	sops.templates."jexactyl.env".content = ''
