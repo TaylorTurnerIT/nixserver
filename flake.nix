@@ -15,12 +15,18 @@
     # Add sops-nix for managing secrets
     sops-nix.url = "github:Mic92/sops-nix";
     sops-nix.inputs.nixpkgs.follows = "nixpkgs";
+
+    jexactyl-src = {
+      url = "github:jexactyl/jexactyl"; 
+      flake = false; # It's not a nix flake itself
+  };
   };
 
   outputs = { self, nixpkgs, nixpkgs-unstable, home-manager, disko, sops-nix, ... }: {
     # --- HOME SERVER ---
     nixosConfigurations.homelab = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
+      specialArgs = { inherit inputs; }; # Ensure inputs are passed to modules
       modules = [
         disko.nixosModules.disko
         ./disko-config.nix
