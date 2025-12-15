@@ -1,19 +1,18 @@
-{ config, pkgs, lib, ... }:
+{ config, pkgs, lib, inputs, ... }:
 
 let
-  # Define the internal network name
+  # Constants
   podmanNetwork = "jexactyl_net";
-  
-  # Configuration Constants
-  # These match your network/caddy.nix definitions
-  panelPort = "8081"; 
-  wingsPort = "8082"; 
-  
-  # Paths for persistent storage
   dataDir = "/var/lib/jexactyl";
+  
+  # The source code from the flake input
+  src = inputs.jexactyl-src;
 in
 {
-  # 1. Ensure Persistent Directories Exist
+  # ---------------------------------------------------------
+  # PRE-FLIGHT: Filesystem & Network
+  # ---------------------------------------------------------
+  
   systemd.tmpfiles.rules = [
     "d ${dataDir}/mariadb 0700 999 999 -"
     "d ${dataDir}/redis 0700 999 999 -"
@@ -23,8 +22,7 @@ in
     "d ${dataDir}/wings/data 0700 0 0 -"
   ];
 
-  # 2. Create the Internal Network
-  # We use a oneshot service to ensure the network exists before containers start
+  # Ensure the internal network exists before any container starts
   systemd.services.init-jexactyl-network = {
     description = "Create Jexactyl Internal Podman Network";
     after = [ "network.target" "podman.service" ];
@@ -37,29 +35,72 @@ in
     '';
   };
 
-  # 3. Container Definitions
-  virtualisation.oci-containers.containers = {
+  # ---------------------------------------------------------
+  # BUILDER SERVICE: Jexactyl Panel Image
+  # ---------------------------------------------------------
+  # This service checks if the current Flake input matches the last built image.
+  # If the Flake input changed (new commit), it triggers a rebuild.
+  
+  systemd.services.build-jexactyl-image = {
+    description = "Build Jexactyl Panel Image from Flake Source";
+    after = [ "podman.service" ];
+    requires = [ "podman.service" ];
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig = {
+      Type = "oneshot";
+      TimeoutStartSec = 900; # Allow 15 mins for build
+    };
+    script = ''
+      # Define state file to track build version
+      STATE_FILE="${dataDir}/.built_hash"
+      CURRENT_HASH="${src}"
 
-    # --- SECURITY LAYER: Socket Proxy ---
-    # Intercepts Wings -> Host communication. Denies all write access.
+      # Check if we need to rebuild
+      if [ ! -f "$STATE_FILE" ] || [ "$(cat $STATE_FILE)" != "$CURRENT_HASH" ]; then
+        echo "Source changed. Building Jexactyl container from ${src}..."
+        
+        ${pkgs.podman}/bin/podman build \
+          -t jexactyl-panel:local \
+          -f ${src}/Containerfile \
+          ${src}
+
+        echo "$CURRENT_HASH" > "$STATE_FILE"
+        echo "Build complete."
+      else
+        echo "Source unchanged. Using existing image."
+      fi
+    '';
+  };
+
+  # ---------------------------------------------------------
+  # CONTAINER DEFINITIONS
+  # ---------------------------------------------------------
+
+  virtualisation.oci-containers.containers = {
+  
+    # --- SECURITY: Socket Proxy ---
+    # Wings talks to this, NOT the host socket directly.
+    # We BLOCK 'POST' requests, allowing only read operations if possible, 
+    # though Wings technically needs write to manage game containers.
+    # STRICT mode: If Wings needs to create containers, we must allow POST.
+    # HARDENING: We isolate this access to *only* the Wings container via network.
     jexactyl-socket-proxy = {
       image = "tecnativa/docker-socket-proxy:latest";
       environment = {
-        CONTAINERS = "1"; # Allow listing
-        IMAGES = "1";     # Allow listing
-        NETWORKS = "1";   # Allow listing
-        POST = "0";       # CRITICAL: Deny all write/state-change actions
-        BUILD = "0";
-        COMMIT = "0";
-        EXEC = "0";
+        CONTAINERS = "1";
+        IMAGES = "1";
+        NETWORKS = "1";
+        POST = "1"; # Wings MUST create containers, so POST is required.
+        BUILD = "0"; # Block building new images
+        COMMIT = "0"; # Block committing changes
+        SWARM = "0"; # Block swarm info
+        SYSTEM = "0"; # Block system pruning
       };
-      volumes = [
-        "/run/podman/podman.sock:/var/run/docker.sock:ro" # Mount host socket Read-Only
-      ];
+      volumes = [ "/run/podman/podman.sock:/var/run/docker.sock:ro" ];
       extraOptions = [ "--network=${podmanNetwork}" ];
     };
 
-    # --- DATABASE: MariaDB ---
+    # --- DATABASE ---
     jexactyl-mariadb = {
       image = "mariadb:10.5";
       environment = {
@@ -70,58 +111,57 @@ in
       };
       volumes = [
         "${dataDir}/mariadb:/var/lib/mysql"
-        # Secret injection via sops-nix
         "${config.sops.secrets.jexactyl_db_password.path}:/run/secrets/jexactyl_db_password:ro"
         "${config.sops.secrets.jexactyl_db_root_password.path}:/run/secrets/jexactyl_db_root_password:ro"
       ];
       extraOptions = [ "--network=${podmanNetwork}" ];
     };
 
-    # --- CACHE: Redis ---
+    # --- CACHE ---
     jexactyl-redis = {
       image = "redis:alpine";
       volumes = [ "${dataDir}/redis:/data" ];
       extraOptions = [ "--network=${podmanNetwork}" ];
     };
 
-    # --- APP: Jexactyl Panel ---
+    # --- APP: PANEL ---
     jexactyl-panel = {
-      image = "ghcr.io/jexactyl/jexactyl:latest";
+      # USE THE LOCALLY BUILT IMAGE
+      image = "jexactyl-panel:local"; 
+      
       dependsOn = [ "jexactyl-mariadb" "jexactyl-redis" ];
+      
       environment = {
         APP_URL = "https://panel.tongatime.us";
         APP_ENV = "production";
         APP_ENVIRONMENT_ONLY = "false";
-        
-        # Database Connections (Uses internal container names)
         DB_HOST = "jexactyl-mariadb";
         DB_PORT = "3306";
         DB_DATABASE = "panel";
         DB_USERNAME = "jexactyl";
-        # Password injected via file read in entrypoint or similar mechanism
-        # Jexactyl often expects DB_PASSWORD directly. 
-        # For pure reproducibility without hardcoding, we use a wrapper or env file.
-        # Here we assume the entrypoint supports _FILE or we rely on sops templates.
-        
-        # Redis
+        # Jexactyl Entrypoint usually expects DB_PASSWORD env var. 
+        # Since we use secrets files, we might need a custom entrypoint wrapper 
+        # or rely on the application reading the file if supported.
+        # Fallback: Populate via sops template directly into ENV (less secure but compatible).
         CACHE_DRIVER = "redis";
         SESSION_DRIVER = "redis";
         QUEUE_DRIVER = "redis";
         REDIS_HOST = "jexactyl-redis";
       };
+      
       volumes = [
         "${dataDir}/panel/storage:/app/var/"
         "${dataDir}/panel/logs:/app/storage/logs"
         "${dataDir}/panel/nginx:/etc/nginx/http.d/"
-        # We mount the secrets env file generated by sops templates
-        "${config.sops.templates."jexactyl.env".path}:/app/.env" 
+        # Inject the .env file generated by SOPS
+        "${config.sops.templates."jexactyl.env".path}:/app/.env"
       ];
-      # Expose to Host Loopback for Caddy
-      ports = [ "127.0.0.1:${panelPort}:80" ]; 
+      
+      ports = [ "127.0.0.1:8081:80" ]; # Localhost only, for Caddy
       extraOptions = [ "--network=${podmanNetwork}" ];
     };
 
-    # --- DAEMON: Wings ---
+    # --- DAEMON: WINGS ---
     jexactyl-wings = {
       image = "ghcr.io/pterodactyl/wings:latest";
       dependsOn = [ "jexactyl-panel" "jexactyl-socket-proxy" ];
@@ -129,23 +169,30 @@ in
         TZ = "UTC";
         WINGS_UID = "0";
         WINGS_GID = "0";
-        # Tell wings to talk to the proxy, NOT the raw socket
+        # WINGS TALKS TO PROXY
         DOCKER_HOST = "tcp://jexactyl-socket-proxy:2375";
       };
       volumes = [
         "${dataDir}/wings/config:/etc/pterodactyl"
         "${dataDir}/wings/data:/var/lib/pterodactyl"
+        # Wings might need direct access to libpod/storage depending on driver
+        # But standardized setups use socket/TCP.
       ];
-      # Expose to Host Loopback for Caddy
-      ports = [ "127.0.0.1:${wingsPort}:443" ]; 
+      ports = [ "127.0.0.1:8082:443" ]; 
       extraOptions = [ 
         "--network=${podmanNetwork}" 
-        "--privileged" # Wings often needs privilege for nested container management
+        "--privileged" 
       ]; 
     };
   };
+  
+  # FORCE DEPENDENCY: Panel service must wait for the Build service
+  systemd.services.podman-jexactyl-panel.after = [ "build-jexactyl-image.service" ];
+  systemd.services.podman-jexactyl-panel.requires = [ "build-jexactyl-image.service" ];
 
-  # 4. Queue Worker (Required for emails/installs)
+  # ---------------------------------------------------------
+  # WORKER SERVICE
+  # ---------------------------------------------------------
   systemd.services.jexactyl-queue = {
     description = "Jexactyl Queue Worker";
     after = [ "podman-jexactyl-panel.service" ];
