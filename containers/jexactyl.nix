@@ -74,14 +74,11 @@ in
         [ -f $BUILD_DIR/README.md ] || echo "# Jexactyl" > $BUILD_DIR/README.md
 
         # --- PATCH: Fix Yacron/Libz Conflict ---
-        # We append instructions to the end of the Containerfile to:
-        # 1. Install Python3 and Pip
-        # 2. Remove the pre-compiled yacron binary (which causes the LD_LIBRARY_PATH crash)
-        # 3. Install yacron via pip (which uses system libraries safely)
         echo "" >> $BUILD_DIR/Containerfile
-        echo "RUN apk add --no-cache python3 py3-pip && \\" >> $BUILD_DIR/Containerfile
+        echo "RUN apt-get update && apt-get install -y python3 python3-pip && \\" >> $BUILD_DIR/Containerfile
         echo "    rm -f /usr/local/bin/yacron && \\" >> $BUILD_DIR/Containerfile
-        echo "    pip3 install yacron --break-system-packages" >> $BUILD_DIR/Containerfile
+        echo "    pip3 install yacron --break-system-packages && \\" >> $BUILD_DIR/Containerfile
+        echo "    apt-get clean && rm -rf /var/lib/apt/lists/*" >> $BUILD_DIR/Containerfile
         # ---------------------------------------
 
         ${pkgs.podman}/bin/podman build \
