@@ -97,8 +97,8 @@ in
 			echo "    rm -f /usr/local/bin/yacron && \\" >> $BUILD_DIR/Containerfile
 			echo "    pip3 install yacron --break-system-packages || pip3 install yacron" >> $BUILD_DIR/Containerfile
 			
-			# # 2. Switch back to the limited user (Jexactyl Standard)
-			# echo "USER nginx" >> $BUILD_DIR/Containerfile
+			# 2. Switch back to the limited user (Jexactyl Standard)
+			echo "USER nginx" >> $BUILD_DIR/Containerfile
 			# ---------------------------------------
 
 			${pkgs.podman}/bin/podman build \
