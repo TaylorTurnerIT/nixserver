@@ -42,73 +42,74 @@ in
 	# If the Flake input changed (new commit), it triggers a rebuild.
 	
 	systemd.services.build-jexactyl-image = {
-		description = "Build Jexactyl Panel Image from Flake Source";
-		after = [ "podman.service" ];
-		requires = [ "podman.service" ];
-		wantedBy = [ "multi-user.target" ];
-		serviceConfig = {
-		Type = "oneshot";
-		TimeoutStartSec = 900;
-		};
-		script = ''
-		# Define state file to track build version
-		STATE_FILE="${dataDir}/.built_hash"
-		CURRENT_HASH="${src}"
+    description = "Build Jexactyl Panel Image from Flake Source";
+    after = [ "podman.service" ];
+    requires = [ "podman.service" ];
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig = {
+      Type = "oneshot";
+      TimeoutStartSec = 900;
+    };
+    script = ''
+      # Define state file to track build version
+      STATE_FILE="${dataDir}/.built_hash"
+      CURRENT_HASH="${src}"
 
-		# Check if we need to rebuild
-		if [ ! -f "$STATE_FILE" ] || [ "$(cat $STATE_FILE)" != "$CURRENT_HASH" ]; then
-			echo "Source changed. Building Jexactyl container from ${src}..."
+      # Check if we need to rebuild
+      if [ ! -f "$STATE_FILE" ] || [ "$(cat $STATE_FILE)" != "$CURRENT_HASH" ]; then
+        echo "Source changed. Building Jexactyl container from ${src}..."
 
-			BUILD_DIR=$(mktemp -d)
-			trap "rm -rf $BUILD_DIR" EXIT
-			cp -r ${src}/. $BUILD_DIR/
+        BUILD_DIR=$(mktemp -d)
+        trap "rm -rf $BUILD_DIR" EXIT
+        cp -r ${src}/. $BUILD_DIR/
 
-			# Create missing files
-			touch $BUILD_DIR/.npmrc
-			touch $BUILD_DIR/CHANGELOG.md
-			touch $BUILD_DIR/SECURITY.md
-			[ -f $BUILD_DIR/LICENSE.md ] || echo "MIT License" > $BUILD_DIR/LICENSE.md
-			[ -f $BUILD_DIR/README.md ] || echo "# Jexactyl" > $BUILD_DIR/README.md
+        # Create missing files
+        touch $BUILD_DIR/.npmrc
+        touch $BUILD_DIR/CHANGELOG.md
+        touch $BUILD_DIR/SECURITY.md
+        [ -f $BUILD_DIR/LICENSE.md ] || echo "MIT License" > $BUILD_DIR/LICENSE.md
+        [ -f $BUILD_DIR/README.md ] || echo "# Jexactyl" > $BUILD_DIR/README.md
 
-			# --- PATCH: Install Python, Yacron, and Fix Permissions ---
-			echo "" >> $BUILD_DIR/Containerfile
-			
-			# 1. Switch to ROOT for installation
-			echo "USER root" >> $BUILD_DIR/Containerfile
-			
-			# 2. Install Dependencies (Distro Agnostic)
-			echo "RUN set -e; \\" >> $BUILD_DIR/Containerfile
-			echo "    if command -v apk >/dev/null; then apk add --no-cache python3 py3-pip; \\" >> $BUILD_DIR/Containerfile
-			echo "    elif command -v apt-get >/dev/null; then apt-get update && apt-get install -y python3 python3-pip && apt-get clean && rm -rf /var/lib/apt/lists/*; \\" >> $BUILD_DIR/Containerfile
-			echo "    elif command -v microdnf >/dev/null; then microdnf install -y python3 python3-pip && microdnf clean all; \\" >> $BUILD_DIR/Containerfile
-			echo "    elif command -v dnf >/dev/null; then dnf install -y python3 python3-pip && dnf clean all; \\" >> $BUILD_DIR/Containerfile
-			echo "    elif command -v yum >/dev/null; then yum install -y python3 python3-pip && yum clean all; \\" >> $BUILD_DIR/Containerfile
-			echo "    else echo 'Error: No supported package manager found.'; exit 1; fi" >> $BUILD_DIR/Containerfile
-			
-			# 3. Install Yacron
-			echo "RUN rm -f /usr/local/bin/yacron && \\" >> $BUILD_DIR/Containerfile
-			echo "    pip3 install yacron --break-system-packages || pip3 install yacron" >> $BUILD_DIR/Containerfile
-			
-			# 4. CRITICAL: Fix directory permissions for Laravel
-			# Ensure the web root is owned by the nginx user so it can write to cache/storage
-			echo "RUN chown -R nginx:nginx /var/www/pterodactyl || chown -R nginx:root /var/www/pterodactyl" >> $BUILD_DIR/Containerfile
-			
-			# 5. Switch back to the correct web user
-			echo "USER nginx" >> $BUILD_DIR/Containerfile
-			# ---------------------------------------
+        # --- PATCH: Install Python, Yacron, and Fix Permissions ---
+        echo "" >> $BUILD_DIR/Containerfile
+        
+        # 1. Switch to ROOT for installation
+        echo "USER root" >> $BUILD_DIR/Containerfile
+        
+        # 2. Install Dependencies (Distro Agnostic)
+        echo "RUN set -e; \\" >> $BUILD_DIR/Containerfile
+        echo "    if command -v apk >/dev/null; then apk add --no-cache python3 py3-pip; \\" >> $BUILD_DIR/Containerfile
+        echo "    elif command -v apt-get >/dev/null; then apt-get update && apt-get install -y python3 python3-pip && apt-get clean && rm -rf /var/lib/apt/lists/*; \\" >> $BUILD_DIR/Containerfile
+        echo "    elif command -v microdnf >/dev/null; then microdnf install -y python3 python3-pip && microdnf clean all; \\" >> $BUILD_DIR/Containerfile
+        echo "    elif command -v dnf >/dev/null; then dnf install -y python3 python3-pip && dnf clean all; \\" >> $BUILD_DIR/Containerfile
+        echo "    elif command -v yum >/dev/null; then yum install -y python3 python3-pip && yum clean all; \\" >> $BUILD_DIR/Containerfile
+        echo "    else echo 'Error: No supported package manager found.'; exit 1; fi" >> $BUILD_DIR/Containerfile
+        
+        # 3. Install Yacron
+        echo "RUN rm -f /usr/local/bin/yacron && \\" >> $BUILD_DIR/Containerfile
+        echo "    pip3 install yacron --break-system-packages || pip3 install yacron" >> $BUILD_DIR/Containerfile
+        
+        # 4. CRITICAL: "Nuclear" Permissions Fix
+        # We use chmod 777 so ANY user (nginx, nobody, www-data) can write here.
+        # This bypasses the need to guess the exact UID/Username.
+        echo "RUN chmod -R 777 /var/www/pterodactyl/bootstrap/cache /var/www/pterodactyl/storage" >> $BUILD_DIR/Containerfile
+        
+        # 5. Do NOT switch user back manually. 
+        # We let the Base Image's original ENTRYPOINT handle the user switching.
+        # ---------------------------------------
 
-			${pkgs.podman}/bin/podman build \
-			-t jexactyl-panel:local \
-			-f $BUILD_DIR/Containerfile \
-			$BUILD_DIR
+        ${pkgs.podman}/bin/podman build \
+          -t jexactyl-panel:local \
+          -f $BUILD_DIR/Containerfile \
+          $BUILD_DIR
 
-			echo "$CURRENT_HASH" > "$STATE_FILE"
-			echo "Build complete."
-		else
-			echo "Source unchanged. Using existing image."
-		fi
-	'';
-};
+        echo "$CURRENT_HASH" > "$STATE_FILE"
+        echo "Build complete."
+      else
+        echo "Source unchanged. Using existing image."
+      fi
+    '';
+	};
 
 	# ---------------------------------------------------------
 	# CONTAINER DEFINITIONS
