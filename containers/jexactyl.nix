@@ -59,11 +59,8 @@ in
 		if [ ! -f "$STATE_FILE" ] || [ "$(cat $STATE_FILE)" != "$CURRENT_HASH" ]; then
 			echo "Source changed. Building Jexactyl container from ${src}..."
 
-			# Create temporary build context
 			BUILD_DIR=$(mktemp -d)
 			trap "rm -rf $BUILD_DIR" EXIT
-
-			# Copy source to build directory
 			cp -r ${src}/. $BUILD_DIR/
 
 			# Create missing files
@@ -73,31 +70,30 @@ in
 			[ -f $BUILD_DIR/LICENSE.md ] || echo "MIT License" > $BUILD_DIR/LICENSE.md
 			[ -f $BUILD_DIR/README.md ] || echo "# Jexactyl" > $BUILD_DIR/README.md
 
-			# --- PATCH: Universal Package Manager Detection (Root Mode) ---
+			# --- PATCH: Install Python, Yacron, and Fix Permissions ---
 			echo "" >> $BUILD_DIR/Containerfile
 			
-			# 1. Switch to ROOT to allow package installation
+			# 1. Switch to ROOT for installation
 			echo "USER root" >> $BUILD_DIR/Containerfile
 			
+			# 2. Install Dependencies (Distro Agnostic)
 			echo "RUN set -e; \\" >> $BUILD_DIR/Containerfile
-			echo "    if command -v apk >/dev/null; then \\" >> $BUILD_DIR/Containerfile
-			echo "        apk add --no-cache python3 py3-pip; \\" >> $BUILD_DIR/Containerfile
-			echo "    elif command -v apt-get >/dev/null; then \\" >> $BUILD_DIR/Containerfile
-			echo "        apt-get update && apt-get install -y python3 python3-pip && \\" >> $BUILD_DIR/Containerfile
-			echo "        apt-get clean && rm -rf /var/lib/apt/lists/*; \\" >> $BUILD_DIR/Containerfile
-			echo "    elif command -v microdnf >/dev/null; then \\" >> $BUILD_DIR/Containerfile
-			echo "        microdnf install -y python3 python3-pip && microdnf clean all; \\" >> $BUILD_DIR/Containerfile
-			echo "    elif command -v dnf >/dev/null; then \\" >> $BUILD_DIR/Containerfile
-			echo "        dnf install -y python3 python3-pip && dnf clean all; \\" >> $BUILD_DIR/Containerfile
-			echo "    elif command -v yum >/dev/null; then \\" >> $BUILD_DIR/Containerfile
-			echo "        yum install -y python3 python3-pip && yum clean all; \\" >> $BUILD_DIR/Containerfile
-			echo "    else \\" >> $BUILD_DIR/Containerfile
-			echo "        echo 'Error: No supported package manager found.'; exit 1; \\" >> $BUILD_DIR/Containerfile
-			echo "    fi && \\" >> $BUILD_DIR/Containerfile
-			echo "    rm -f /usr/local/bin/yacron && \\" >> $BUILD_DIR/Containerfile
+			echo "    if command -v apk >/dev/null; then apk add --no-cache python3 py3-pip; \\" >> $BUILD_DIR/Containerfile
+			echo "    elif command -v apt-get >/dev/null; then apt-get update && apt-get install -y python3 python3-pip && apt-get clean && rm -rf /var/lib/apt/lists/*; \\" >> $BUILD_DIR/Containerfile
+			echo "    elif command -v microdnf >/dev/null; then microdnf install -y python3 python3-pip && microdnf clean all; \\" >> $BUILD_DIR/Containerfile
+			echo "    elif command -v dnf >/dev/null; then dnf install -y python3 python3-pip && dnf clean all; \\" >> $BUILD_DIR/Containerfile
+			echo "    elif command -v yum >/dev/null; then yum install -y python3 python3-pip && yum clean all; \\" >> $BUILD_DIR/Containerfile
+			echo "    else echo 'Error: No supported package manager found.'; exit 1; fi" >> $BUILD_DIR/Containerfile
+			
+			# 3. Install Yacron
+			echo "RUN rm -f /usr/local/bin/yacron && \\" >> $BUILD_DIR/Containerfile
 			echo "    pip3 install yacron --break-system-packages || pip3 install yacron" >> $BUILD_DIR/Containerfile
 			
-			# 2. Switch back to the limited user (Jexactyl Standard)
+			# 4. CRITICAL: Fix directory permissions for Laravel
+			# Ensure the web root is owned by the nginx user so it can write to cache/storage
+			echo "RUN chown -R nginx:nginx /var/www/pterodactyl || chown -R nginx:root /var/www/pterodactyl" >> $BUILD_DIR/Containerfile
+			
+			# 5. Switch back to the correct web user
 			echo "USER nginx" >> $BUILD_DIR/Containerfile
 			# ---------------------------------------
 
@@ -111,8 +107,8 @@ in
 		else
 			echo "Source unchanged. Using existing image."
 		fi
-		'';
-	};
+	'';
+};
 
 	# ---------------------------------------------------------
 	# CONTAINER DEFINITIONS
