@@ -1,12 +1,34 @@
 { config, pkgs, lib, inputs, ... }:
 
 let
-	# Constants
-	podmanNetwork = "jexactyl_net";
-	dataDir = "/var/lib/jexactyl";
-	
-	# The source code from the flake input
-	src = inputs.jexactyl-src;
+    # Constants
+    podmanNetwork = "jexactyl_net";
+    dataDir = "/var/lib/jexactyl";
+    src = inputs.jexactyl-src;
+
+    # --- DEFINE CLEAN CADDYFILE HERE ---
+    caddyFile = pkgs.writeText "Caddyfile" ''
+    {
+        admin 127.0.0.1:2024
+    }
+
+    :8081 {
+        root * /var/www/pterodactyl/public
+        file_server
+        php_fastcgi 127.0.0.1:9000
+        
+        header X-Content-Type-Options nosniff
+        header X-XSS-Protection "1; mode=block"
+        header X-Robots-Tag none
+        header Content-Security-Policy "frame-ancestors 'self'"
+        header X-Frame-Options DENY
+        header Referrer-Policy same-origin
+        
+        request_body {
+            max_size 100m
+        }
+    }
+    '';
 in
 {
 	# ---------------------------------------------------------
@@ -39,17 +61,15 @@ in
       TimeoutStartSec = 900;
     };
     script = ''
-      # Define state file to track build version
-      STATE_FILE="${dataDir}/.built_hash"
-      CURRENT_HASH="${src}"
+		STATE_FILE="${dataDir}/.built_hash"
+		CURRENT_HASH="${src}"
 
       # Check if we need to rebuild
       if [ ! -f "$STATE_FILE" ] || [ "$(cat $STATE_FILE)" != "$CURRENT_HASH" ]; then
-        echo "Source changed. Building Jexactyl container from ${src}..."
-
-        BUILD_DIR=$(mktemp -d)
-        trap "rm -rf $BUILD_DIR" EXIT
-        cp -r ${src}/. $BUILD_DIR/
+        echo "Source changed. Building Jexactyl container..."
+		BUILD_DIR=$(mktemp -d)
+		trap "rm -rf $BUILD_DIR" EXIT
+		cp -r ${src}/. $BUILD_DIR/
 
         # Create missing files
         touch $BUILD_DIR/.npmrc
@@ -80,39 +100,11 @@ in
         # This bypasses the need to guess the exact UID/Username.
         echo "RUN chmod -R 777 /var/www/pterodactyl/bootstrap/cache /var/www/pterodactyl/storage" >> $BUILD_DIR/Containerfile
 
-        # 5. Inject Clean Caddyfile
-        # We replace the sed hacks with a purely declarative Caddyfile.
-        # This listens on 8081 (app) and 2024 (admin) to avoid host conflicts.
-        # We use multiple echos to avoid Nix/Shell escaping issues with heredocs.
+        # 5. Inject Clean Caddyfile (Declarative)
+		echo "Injecting declarative Caddyfile..."
+		cp ${caddyFile} $BUILD_DIR/Caddyfile
+		echo "COPY Caddyfile /etc/caddy/Caddyfile" >> $BUILD_DIR/Containerfile
         
-        echo "{" > $BUILD_DIR/Caddyfile
-        echo "    admin 127.0.0.1:2024" >> $BUILD_DIR/Caddyfile
-        echo "}" >> $BUILD_DIR/Caddyfile
-        echo "" >> $BUILD_DIR/Caddyfile
-        echo ":8081 {" >> $BUILD_DIR/Caddyfile
-        echo "    root * /var/www/pterodactyl/public" >> $BUILD_DIR/Caddyfile
-        echo "    file_server" >> $BUILD_DIR/Caddyfile
-        echo "    php_fastcgi 127.0.0.1:9000" >> $BUILD_DIR/Caddyfile
-        echo "" >> $BUILD_DIR/Caddyfile
-        echo "    header X-Content-Type-Options nosniff" >> $BUILD_DIR/Caddyfile
-        echo "    header X-XSS-Protection \"1; mode=block\"" >> $BUILD_DIR/Caddyfile
-        echo "    header X-Robots-Tag none" >> $BUILD_DIR/Caddyfile
-        echo "    header Content-Security-Policy \"frame-ancestors 'self'\"" >> $BUILD_DIR/Caddyfile
-        echo "    header X-Frame-Options DENY" >> $BUILD_DIR/Caddyfile
-        echo "    header Referrer-Policy same-origin" >> $BUILD_DIR/Caddyfile
-        echo "    request_body {" >> $BUILD_DIR/Caddyfile
-        echo "        max_size 100m" >> $BUILD_DIR/Caddyfile
-        echo "    }" >> $BUILD_DIR/Caddyfile
-        echo "}" >> $BUILD_DIR/Caddyfile
-
-        # Overwrite the container's default config with ours
-        echo "COPY Caddyfile /etc/caddy/Caddyfile" >> $BUILD_DIR/Containerfile
-        
-        # Add the global admin block at the top
-        echo "RUN sed -i '1i {\\\\n  admin 127.0.0.1:2024\\\\n}' /etc/caddy/Caddyfile" >> $BUILD_DIR/Containerfile
-
-        # 6. Do NOT switch user back manually.
-        # We let the Base Image's original ENTRYPOINT handle the user switching.
         # ---------------------------------------
 
         ${pkgs.podman}/bin/podman build \
