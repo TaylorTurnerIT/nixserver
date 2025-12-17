@@ -82,9 +82,9 @@ in
         # This bypasses the need to guess the exact UID/Username.
         echo "RUN chmod -R 777 /var/www/pterodactyl/bootstrap/cache /var/www/pterodactyl/storage" >> $BUILD_DIR/Containerfile
 
-        # 5. Configure nginx to listen on port 8081 instead of 80 (for host networking)
-        echo "RUN find /etc/nginx -type f -exec sed -i 's/listen 80/listen 8081/g' {} +" >> $BUILD_DIR/Containerfile
-        echo "RUN find /etc/nginx -type f -exec sed -i 's/listen \[::\]:80/listen [::]:8081/g' {} +" >> $BUILD_DIR/Containerfile
+        # 5. Configure Caddy to listen on port 8081 and disable admin API (for host networking)
+        echo "RUN sed -i 's/:8080/:8081/g' /etc/caddy/Caddyfile" >> $BUILD_DIR/Containerfile
+        echo "RUN sed -i '1i {\\\\n  admin off\\\\n}' /etc/caddy/Caddyfile" >> $BUILD_DIR/Containerfile
 
         # 6. Do NOT switch user back manually.
         # We let the Base Image's original ENTRYPOINT handle the user switching.
