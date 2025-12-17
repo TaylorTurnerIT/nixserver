@@ -77,8 +77,6 @@ in
         echo "RUN rm -f /usr/local/bin/yacron && \\" >> $BUILD_DIR/Containerfile
         echo "    pip3 install yacron --break-system-packages || pip3 install yacron" >> $BUILD_DIR/Containerfile
         
-        # 4. CRITICAL: "Nuclear" Permissions Fix
-        # We use chmod 777 so ANY user (nginx, nobody, www-data) can write here.
         # This bypasses the need to guess the exact UID/Username.
         echo "RUN chmod -R 777 /var/www/pterodactyl/bootstrap/cache /var/www/pterodactyl/storage" >> $BUILD_DIR/Containerfile
 
