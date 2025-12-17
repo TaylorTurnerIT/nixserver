@@ -6,7 +6,7 @@ let
     dataDir = "/var/lib/jexactyl";
     src = inputs.jexactyl-src;
 
-    # --- DEFINE CLEAN CADDYFILE HERE ---
+    # --- 1. CLEAN CADDYFILE (Fixes Protocol Error) ---
     caddyFile = pkgs.writeText "Caddyfile" ''
     {
         admin 127.0.0.1:2024
@@ -29,6 +29,24 @@ let
         }
     }
     '';
+
+    # --- 2. RUNTIME ENTRYPOINT (Fixes /tmp Permission Error) ---
+    # This script runs every time the container starts.
+    # It forces the /tmp directories to exist with wide-open permissions
+    # so both the web server and console user can write to them.
+    entrypointScript = pkgs.writeText "entrypoint.sh" ''
+        #!/bin/sh
+        echo "Initializing Jexactyl temp directories..."
+        mkdir -p /tmp/pterodactyl/framework/views
+        mkdir -p /tmp/pterodactyl/framework/cache
+        mkdir -p /tmp/pterodactyl/framework/sessions
+        
+        # Set permission to 777 so root, nginx, and jexactyl users can all write
+        chmod -R 777 /tmp/pterodactyl
+        
+        echo "Starting Supervisord..."
+        exec supervisord -n -c /etc/supervisord.conf
+    '';
 in
 {
     # ---------------------------------------------------------
@@ -43,7 +61,6 @@ in
         "d ${dataDir}/wings/config 0700 0 0 -"
         "d ${dataDir}/wings/data 0700 0 0 -"
     ];
-
 
     # ---------------------------------------------------------
     # BUILDER SERVICE: Jexactyl Panel Image
@@ -61,50 +78,52 @@ in
         STATE_FILE="${dataDir}/.built_hash"
         CURRENT_HASH="${src}"
 
+      # Always rebuild if hash changed or explicitly forced
       if [ ! -f "$STATE_FILE" ] || [ "$(cat $STATE_FILE)" != "$CURRENT_HASH" ]; then
         echo "Source changed. Building Jexactyl container..."
         BUILD_DIR=$(mktemp -d)
         trap "rm -rf $BUILD_DIR" EXIT
         cp -r ${src}/. $BUILD_DIR/
 
-        # Create missing files
+        # Create basic files
         touch $BUILD_DIR/.npmrc
         touch $BUILD_DIR/CHANGELOG.md
         touch $BUILD_DIR/SECURITY.md
         [ -f $BUILD_DIR/LICENSE.md ] || echo "MIT License" > $BUILD_DIR/LICENSE.md
         [ -f $BUILD_DIR/README.md ] || echo "# Jexactyl" > $BUILD_DIR/README.md
 
-        # --- PATCH: Install Python, Yacron, and Fix Permissions ---
+        # --- PATCH: Install Python & Yacron ---
         echo "" >> $BUILD_DIR/Containerfile
-        
-        # 1. Switch to ROOT for installation
         echo "USER root" >> $BUILD_DIR/Containerfile
         
-        # 2. Install Dependencies
+        # Install Dependencies
         echo "RUN set -e; \\" >> $BUILD_DIR/Containerfile
         echo "    if command -v apk >/dev/null; then apk add --no-cache python3 py3-pip; \\" >> $BUILD_DIR/Containerfile
         echo "    elif command -v apt-get >/dev/null; then apt-get update && apt-get install -y python3 python3-pip && apt-get clean && rm -rf /var/lib/apt/lists/*; \\" >> $BUILD_DIR/Containerfile
-        echo "    elif command -v microdnf >/dev/null; then microdnf install -y python3 python3-pip && microdnf clean all; \\" >> $BUILD_DIR/Containerfile
-        echo "    elif command -v dnf >/dev/null; then dnf install -y python3 python3-pip && dnf clean all; \\" >> $BUILD_DIR/Containerfile
-        echo "    elif command -v yum >/dev/null; then yum install -y python3 python3-pip && yum clean all; \\" >> $BUILD_DIR/Containerfile
         echo "    else echo 'Error: No supported package manager found.'; exit 1; fi" >> $BUILD_DIR/Containerfile
         
-        # 3. Install Yacron
+        # Install Yacron
         echo "RUN rm -f /usr/local/bin/yacron && \\" >> $BUILD_DIR/Containerfile
         echo "    pip3 install yacron --break-system-packages || pip3 install yacron" >> $BUILD_DIR/Containerfile
         
-        # 4. FIX STORAGE PERMISSIONS (Standard Path)
+        # Fix Storage Permissions
         echo "RUN chmod -R 777 /var/www/pterodactyl/bootstrap/cache /var/www/pterodactyl/storage" >> $BUILD_DIR/Containerfile
 
-        # 5. FIX TEMP PERMISSIONS (Fixes your specific error)
-        # Jexactyl seems to be using /tmp/pterodactyl for compiled views
-        echo "RUN mkdir -p /tmp/pterodactyl/framework/views" >> $BUILD_DIR/Containerfile
-        echo "RUN chmod -R 777 /tmp/pterodactyl" >> $BUILD_DIR/Containerfile
-
-        # 6. Inject Clean Caddyfile (Declarative)
+        # --- INJECT CONFIGS ---
+        
+        # 1. Caddyfile
         echo "Injecting declarative Caddyfile..."
         cp ${caddyFile} $BUILD_DIR/Caddyfile
         echo "COPY Caddyfile /etc/caddy/Caddyfile" >> $BUILD_DIR/Containerfile
+
+        # 2. Entrypoint Script
+        echo "Injecting runtime entrypoint..."
+        cp ${entrypointScript} $BUILD_DIR/entrypoint.sh
+        echo "COPY entrypoint.sh /entrypoint.sh" >> $BUILD_DIR/Containerfile
+        echo "RUN chmod +x /entrypoint.sh" >> $BUILD_DIR/Containerfile
+        
+        # Set new Entrypoint
+        echo "ENTRYPOINT [\"/entrypoint.sh\"]" >> $BUILD_DIR/Containerfile
         
         # ---------------------------------------
 
@@ -183,7 +202,6 @@ in
         };
 
         volumes = [
-            # FIXED: Mounted to /storage, not /var/
             "${dataDir}/panel/storage:/var/www/pterodactyl/storage"
             "${dataDir}/panel/logs:/var/www/pterodactyl/storage/logs"
             "${config.sops.templates."jexactyl.env".path}:/var/www/pterodactyl/.env"
@@ -191,7 +209,6 @@ in
 
         extraOptions = [ "--network=host" ];
     };
-
 
     jexactyl-wings = {
         image = "ghcr.io/pterodactyl/wings:latest";
