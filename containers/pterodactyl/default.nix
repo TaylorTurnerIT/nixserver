@@ -114,6 +114,7 @@ in {
 	"pterodactyl_admin_password" = { owner = "root"; };
 	"pterodactyl_wings_uuid" = { owner = "root"; };
 	"pterodactyl_wings_token" = { owner = "root"; };
+	"pterodactyl_wings_token_id" = { owner = "root"; };
   };
 
   # --- Configuration Templates ---
