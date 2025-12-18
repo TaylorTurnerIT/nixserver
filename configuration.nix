@@ -112,6 +112,10 @@
 		enable = true;
 		# Prune images automatically to save space
 		autoPrune.enable = true;
+
+		daemon.settings = {
+			dns = [ "1.1.1.1" "8.8.8.8" ];
+		};
   };
 
 
