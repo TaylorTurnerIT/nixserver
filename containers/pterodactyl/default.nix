@@ -4,28 +4,81 @@ let
   podmanNetwork = "pterodactyl_net";
   dataDir = "/var/lib/pterodactyl";
   
-  # Define images here for easy updates
   images = {
     panel = "ghcr.io/pterodactyl/panel:latest";
     wings = "ghcr.io/pterodactyl/wings:latest";
     mariadb = "mariadb:10.11";
     redis = "redis:alpine";
   };
+
+  # --- SCRIPTS ---
+  # We define the scripts here and mount them later. 
+  # We use writeText to avoid Nix-specific shebangs that break inside Alpine containers.
+
+  panelEntrypoint = pkgs.writeText "panel-entrypoint.sh" ''
+    #!/bin/sh
+    set -e
+    
+    echo "--> Injecting secrets..."
+    cp /tmp/.env.sops /app/.env
+    
+    echo "--> Waiting for Database..."
+    # Alpine's nc syntax is slightly different, checking if port is open
+    until nc -z pterodactyl-db 3306; do 
+      echo "Waiting for database..."
+      sleep 2
+    done
+
+    # Check for First Run
+    if [ ! -f /app/var/.installed ]; then
+        echo "--> FIRST RUN: Initializing..."
+        
+        echo "--> Running Migrations..."
+        php artisan migrate --seed --force
+
+        echo "--> Creating Admin User..."
+        # Read password from secret
+        ADMIN_PASS=$(cat /run/secrets/admin_password)
+        
+        php artisan p:user:make \
+          --email="admin@tongatime.us" \
+          --username="admin" \
+          --name_first="Admin" \
+          --name_last="User" \
+          --password="$ADMIN_PASS" \
+          --admin=1
+
+        echo "--> Setup Complete."
+        touch /app/var/.installed
+    else
+        echo "--> Existing installation found."
+        echo "--> Running migrations on boot..."
+        php artisan migrate --force
+    fi
+
+    echo "--> Starting Panel..."
+    /usr/sbin/php-fpm8.3 --daemonize
+    nginx -g "daemon off;"
+  '';
+
+  workerEntrypoint = pkgs.writeText "worker-entrypoint.sh" ''
+    #!/bin/sh
+    set -e
+    cp /tmp/.env.sops /app/.env
+    php artisan queue:work --sleep=3 --tries=3
+  '';
+
 in {
   # --- Secrets Management ---
-  # We only define the distinct secret values here, not the whole files.
   sops.secrets = {
     "pterodactyl/app_key" = { owner = "root"; };
     "pterodactyl/db_password" = { owner = "root"; };
-    "pterodactyl/admin_password" = { owner = "root"; }; # New: for auto-creating the user
-    # Secrets for Wings (You get these from the Panel after creating a node)
+    "pterodactyl/admin_password" = { owner = "root"; };
     "pterodactyl/wings_uuid" = { owner = "root"; };
     "pterodactyl/wings_token" = { owner = "root"; };
   };
 
   # --- Configuration Templates ---
-
-  # A. Panel Environment (.env)
   sops.templates."pterodactyl-panel.env" = {
     content = ''
       APP_ENV=production
@@ -53,20 +106,17 @@ in {
     owner = "root";
   };
 
-  # B. Wings Configuration (config.yml)
-  # This replaces the binary secret. We construct the YAML structure here.
   sops.templates."pterodactyl-wings.yml" = {
     content = builtins.toJSON {
       debug = false;
-      # We inject the UUID and Token from secrets
       uuid = "${config.sops.placeholder."pterodactyl/wings_uuid"}";
-      token_id = "SET_IN_PANEL_IF_NEEDED"; # Usually handled by the full token below
+      token_id = "SET_IN_PANEL_IF_NEEDED";
       token = "${config.sops.placeholder."pterodactyl/wings_token"}";
       
       api = {
         host = "0.0.0.0";
         port = 8080;
-        ssl = { enabled = false; }; # Caddy handles SSL
+        ssl = { enabled = false; };
         upload_limit = 100;
       };
       
@@ -125,54 +175,11 @@ in {
         "${dataDir}/certs:/etc/letsencrypt"
         "${config.sops.templates."pterodactyl-panel.env".path}:/tmp/.env.sops:ro"
         "${config.sops.secrets."pterodactyl/admin_password".path}:/run/secrets/admin_password:ro"
+        "${panelEntrypoint}:/entrypoint.sh:ro"
       ];
       
-      # --- DECLARATIVE SETUP SCRIPT ---
-      # This entrypoint checks for .installed flag to run initial setup only once.
-      entrypoint = "${pkgs.writeShellScript "panel-entrypoint.sh" ''
-        #!/bin/sh
-        set -e
-        
-        # 1. Inject Secrets
-        cp /tmp/.env.sops /app/.env
-        
-        # 2. Wait for DB
-        echo "--> Waiting for Database..."
-        until nc -z -v -w30 pterodactyl-db 3306; do 
-          sleep 5 
-        done
-
-        # 3. Check for First Run
-        if [ ! -f /app/var/.installed ]; then
-            echo "--> FIRST RUN DETECTED: Initializing..."
-            
-            echo "--> Running Migrations..."
-            php artisan migrate --seed --force
-
-            echo "--> Creating Admin User..."
-            # We read the password from the secret file
-            ADMIN_PASS=$(cat /run/secrets/admin_password)
-            
-            php artisan p:user:make \
-              --email="admin@tongatime.us" \
-              --username="admin" \
-              --name_first="Admin" \
-              --name_last="User" \
-              --password="$ADMIN_PASS" \
-              --admin=1
-
-            echo "--> Marking installation as complete."
-            touch /app/var/.installed
-        else
-            echo "--> Installation found. Skipping setup."
-            # Still run migrations on restart to handle updates
-            php artisan migrate --force
-        fi
-
-        echo "--> Starting Panel..."
-        /usr/sbin/php-fpm8.3 --daemonize
-        nginx -g "daemon off;"
-      ''}";
+      # Run the mounted script with sh
+      entrypoint = "/bin/sh /entrypoint.sh";
       
       dependsOn = [ "pterodactyl-db" "pterodactyl-redis" ];
     };
@@ -185,12 +192,9 @@ in {
         "${dataDir}/var:/app/var"
         "${dataDir}/logs:/app/storage/logs"
         "${config.sops.templates."pterodactyl-panel.env".path}:/tmp/.env.sops:ro"
+        "${workerEntrypoint}:/entrypoint.sh:ro"
       ];
-      entrypoint = "${pkgs.writeShellScript "worker.sh" ''
-        #!/bin/sh
-        cp /tmp/.env.sops /app/.env
-        php artisan queue:work --sleep=3 --tries=3
-      ''}";
+      entrypoint = "/bin/sh /entrypoint.sh";
       dependsOn = [ "pterodactyl-panel" ];
     };
 
@@ -204,7 +208,6 @@ in {
         "/var/lib/pterodactyl-wings/data:/var/lib/pterodactyl"
         "/var/lib/pterodactyl-wings/logs:/var/log/pterodactyl"
         "/tmp/pterodactyl-wings:/tmp/pterodactyl"
-        # Mount the generated config template
         "${config.sops.templates."pterodactyl-wings.yml".path}:/etc/pterodactyl/config.yml:ro"
       ];
       environment = {
@@ -217,7 +220,7 @@ in {
     };
   };
   
-  # --- Permissions ---
+  # --- 5. Permissions ---
   systemd.tmpfiles.rules = [
     "d ${dataDir}/mysql 0700 1000 1000 - -"
     "d ${dataDir}/var 0755 33 33 - -"
