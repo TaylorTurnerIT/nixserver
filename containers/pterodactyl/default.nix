@@ -178,8 +178,8 @@ in {
         "${panelEntrypoint}:/entrypoint.sh:ro"
       ];
       
-      # Run the mounted script with sh
-      entrypoint = "/bin/sh /entrypoint.sh";
+      entrypoint = "/bin/sh";
+      cmd = [ "/entrypoint.sh" ];
       
       dependsOn = [ "pterodactyl-db" "pterodactyl-redis" ];
     };
@@ -195,6 +195,11 @@ in {
         "${workerEntrypoint}:/entrypoint.sh:ro"
       ];
       entrypoint = "/bin/sh /entrypoint.sh";
+    
+      # Define a simple entrypoint that runs the script
+      entrypoint = "/bin/sh";
+      cmd = [ "/entrypoint.sh" ];
+
       dependsOn = [ "pterodactyl-panel" ];
     };
 
