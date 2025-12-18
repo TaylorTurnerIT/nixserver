@@ -19,6 +19,8 @@
 !containers/*.nix
 !containers/foundryvtt/
 !containers/foundryvtt/*.nix
+!containers/pterodactyl/
+!containers/pterodactyl/*.nix
 
 # Allow ALL in the network folder
 !network/
