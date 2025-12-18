@@ -33,51 +33,85 @@ let
 	
 	echo "--> Waiting for Database..."
 	until nc -z pterodactyl-db 3306; do 
-	  sleep 2
+		sleep 2
 	done
 
 	echo "--> Running Migrations..."
 	php artisan migrate --seed --force
 
-	# 3. Smart User Creation
+	# 3. Check for existing admin user (without tinker hang)
 	echo "--> Checking for Admin User..."
-
+	
 	if [ -f /app/var/admin_created ]; then
 		echo "--> Admin user already created in previous run. Skipping."
 	else
 		echo "--> Creating Admin user..."
 		ADMIN_PASS=$(cat /run/secrets/admin_password)
 		php artisan p:user:make \
-		  --email="admin@tongatime.us" \
-		  --username="admin" \
-		  --name-first="Admin" \
-		  --name-last="User" \
-		  --password="$ADMIN_PASS" \
-		  --admin=1 \
-		  --force || true
+			--email="admin@tongatime.us" \
+			--username="admin" \
+			--name-first="Admin" \
+			--name-last="User" \
+			--password="$ADMIN_PASS" \
+			--admin=1 \
+			--force || true
 		touch /app/var/admin_created
 	fi
 
 	echo "--> Clearing Application Cache..."
-	# These commands run as ROOT and create root-owned files.
-	# We must run them BEFORE the final chown.
-	php artisan optimize:clear
-	php artisan config:clear
-	php artisan view:clear
+	php artisan optimize:clear || true
+	php artisan config:clear || true
+	php artisan view:clear || true
 
 	echo "--> Setting Permissions..."
-	# Ensure www-data owns EVERYTHING, including the logs/cache created by the root commands above.
 	chown -R www-data:www-data /app/var /app/storage /app/bootstrap/cache /app/public
 
-	echo "--> Starting PHP-FPM (as www-data)..."
-	$PHP_FPM --daemonize --allow-to-run-as-root \
-		-d user=www-data \
-		-d group=www-data \
-		-d listen=127.0.0.1:9000
+	# 4. Fix PHP-FPM Configuration
+	echo "--> Configuring PHP-FPM..."
+	sed -i 's/^user = nginx/user = www-data/' /usr/local/etc/php-fpm.conf
+	sed -i 's/^group = nginx/group = www-data/' /usr/local/etc/php-fpm.conf
+	sed -i 's/^listen.owner = nginx/listen.owner = www-data/' /usr/local/etc/php-fpm.conf
+	sed -i 's/^listen.group = nginx/listen.group = www-data/' /usr/local/etc/php-fpm.conf
+	sed -i 's/^pm = ondemand/pm = static/' /usr/local/etc/php-fpm.conf
+	sed -i 's/^pm.max_children = 9/pm.max_children = 5/' /usr/local/etc/php-fpm.conf
+	sed -i '/pm.process_idle_timeout/d' /usr/local/etc/php-fpm.conf
+	
+	cat >> /usr/local/etc/php-fpm.conf <<'FPMEND'
+	pm.start_servers = 2
+	pm.min_spare_servers = 1
+	pm.max_spare_servers = 3
+	catch_workers_output = yes
+	FPMEND
+
+	echo "--> Starting PHP-FPM..."
+	$PHP_FPM -F &
+	FPM_PID=$!
+	
+	# Wait and verify workers spawned
+	sleep 2
+	echo "--> Verifying PHP-FPM workers..."
+	WORKERS=$(ps aux | grep -c "php-fpm: pool www" || echo "0")
+	if [ "$WORKERS" -gt 0 ]; then
+		echo "--> PHP-FPM has worker processes ready!"
+	else
+		echo "--> WARNING: No PHP-FPM workers detected. Checking status..."
+		ps aux | grep php-fpm
+	fi
+
+	# Verify port is listening
+	for i in 1 2 3 4 5; do
+		if nc -z 127.0.0.1 9000; then
+			echo "--> PHP-FPM port 9000 is ready!"
+			break
+		fi
+		echo "--> Waiting for PHP-FPM port... ($i/5)"
+		sleep 1
+	done
 
 	echo "--> Starting NGINX..."
 	exec nginx -g "daemon off;"
-  '';
+	'';
+
 
   workerEntrypoint = pkgs.writeText "worker-entrypoint.sh" ''
 	#!/bin/sh
