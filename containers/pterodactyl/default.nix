@@ -146,24 +146,25 @@ in {
   };
 
   sops.templates."pterodactyl-wings.yml" = {
-	content = builtins.toJSON {
-	  debug = false;
-	  uuid = "${config.sops.placeholder."pterodactyl_wings_uuid"}";
-	  token_id = "${config.sops.placeholder."pterodactyl_wings_token_id"}";
-	  token = "${config.sops.placeholder."pterodactyl_wings_token"}";
-	  
-	  api = {
+    content = builtins.toJSON {
+      debug = false;
+      uuid = "${config.sops.placeholder."pterodactyl_wings_uuid"}";
+      token_id = "${config.sops.placeholder."pterodactyl_wings_token_id"}";
+      token = "${config.sops.placeholder."pterodactyl_wings_token"}";
+      
+      api = {
         host = "0.0.0.0";
         port = 8082;
         ssl = { enabled = false; };
         upload_limit = 100;
       };
-	  
-	  system = {
-		data = "/var/lib/pterodactyl/volumes";
-		sftp = { bind_port = 2022; };
-	  };
-
+      
+      system = {
+        data = "/var/lib/pterodactyl/volumes";
+        sftp = { bind_port = 2022; };
+        enable_log_rotate = false;
+      };
+      
       docker = {
         network = {
           name = "pterodactyl_nw";
@@ -174,6 +175,9 @@ in {
         };
         domainname = "";
         registries = {};
+        
+        use_performant_inspect = false;
+
         log_config = {
             type = "json-file";
             config = {
@@ -182,11 +186,11 @@ in {
             };
         };
       };
-	  
-	  allowed_mounts = [];
-	  remote = "https://panel.tongatime.us";
-	};
-	owner = "root";
+      
+      allowed_mounts = [];
+      remote = "https://panel.tongatime.us";
+    };
+    owner = "root";
   };
 
   # --- Networking & Firewall ---
