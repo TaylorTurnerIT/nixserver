@@ -27,9 +27,44 @@ let
 	fi
 	echo "--> Detected PHP-FPM at: $PHP_FPM"
 
-	# 2. Environment & Secrets
-	echo "--> Injecting secrets..."
-	cp /tmp/.env.sops /app/.env
+	# 2. Generate .env from mounted secrets
+	echo "--> Generating .env from secrets..."
+	
+	# Read secret values
+	APP_KEY=$(cat /run/secrets/pterodactyl_app_key)
+	DB_PASSWORD=$(cat /run/secrets/pterodactyl_db_password)
+	
+	if [ -z "$APP_KEY" ]; then
+		echo "ERROR: APP_KEY not found at /run/secrets/pterodactyl_app_key"
+		exit 1
+	fi
+	
+	# Generate .env file
+	cat > /app/.env <<ENVEOF
+	APP_ENV=production
+	APP_DEBUG=true
+	APP_KEY=$APP_KEY
+	APP_URL=https://panel.tongatime.us
+	APP_TIMEZONE=UTC
+	APP_SERVICE_AUTHOR=admin@tongatime.us
+	TRUSTED_PROXIES=*
+
+	DB_HOST=pterodactyl-db
+	DB_PORT=3306
+	DB_DATABASE=panel
+	DB_USERNAME=pterodactyl
+	DB_PASSWORD=$DB_PASSWORD
+
+	REDIS_HOST=pterodactyl-redis
+	REDIS_PASSWORD=
+	REDIS_PORT=6379
+
+	CACHE_DRIVER=redis
+	SESSION_DRIVER=redis
+	QUEUE_CONNECTION=redis
+	ENVEOF
+
+	echo "--> .env generated successfully"
 	
 	echo "--> Waiting for Database..."
 	until nc -z pterodactyl-db 3306; do 
@@ -66,9 +101,8 @@ let
 	echo "--> Setting Permissions..."
 	chown -R www-data:www-data /app/var /app/storage /app/bootstrap/cache /app/public
 
-	# 4. Start PHP-FPM using the correct www.conf pool (skip broken main config)
+	# 4. Start PHP-FPM
 	echo "--> Starting PHP-FPM with www pool config..."
-	# Use ONLY the www.conf which has correct user=www-data and static pm
 	$PHP_FPM -c /usr/local/etc/php.ini -y /usr/local/etc/php-fpm.d/www.conf -F &
 	FPM_PID=$!
 	
@@ -96,6 +130,7 @@ let
 	exec nginx -g "daemon off;"
 	'';
 
+
   workerEntrypoint = pkgs.writeText "worker-entrypoint.sh" ''
 	#!/bin/sh
 	set -e
@@ -113,34 +148,6 @@ in {
 	"pterodactyl/admin_password" = { owner = "root"; };
 	"pterodactyl/wings_uuid" = { owner = "root"; };
 	"pterodactyl/wings_token" = { owner = "root"; };
-  };
-
-  # --- Configuration Templates ---
-  sops.templates."pterodactyl-panel.env" = {
-	content = ''
-	  APP_ENV=production
-	  APP_DEBUG=true  # Temporarily true to see 500 errors in browser if they persist
-	  APP_KEY=${config.sops.placeholder."pterodactyl/app_key"}
-	  APP_URL=https://panel.tongatime.us
-	  APP_TIMEZONE=UTC
-	  APP_SERVICE_AUTHOR=admin@tongatime.us
-	  TRUSTED_PROXIES=*
-	  
-	  DB_HOST=pterodactyl-db
-	  DB_PORT=3306
-	  DB_DATABASE=panel
-	  DB_USERNAME=pterodactyl
-	  DB_PASSWORD=${config.sops.placeholder."pterodactyl/db_password"}
-	  
-	  REDIS_HOST=pterodactyl-redis
-	  REDIS_PASSWORD=
-	  REDIS_PORT=6379
-	  
-	  CACHE_DRIVER=redis
-	  SESSION_DRIVER=redis
-	  QUEUE_CONNECTION=redis
-	'';
-	owner = "root";
   };
 
   sops.templates."pterodactyl-wings.yml" = {
@@ -209,35 +216,39 @@ in {
 
 	# --- Panel ---
 	pterodactyl-panel = {
-	  image = images.panel;
-	  extraOptions = [ "--network=${podmanNetwork}" ];
-	  ports = [ "8081:80" ];
-	  volumes = [
+	image = images.panel;
+	extraOptions = [ "--network=${podmanNetwork}" ];
+	ports = [ "8081:80" ];
+	volumes = [
 		"${dataDir}/var:/app/var"
 		"${dataDir}/logs:/app/storage/logs"
-		"${config.sops.templates."pterodactyl-panel.env".path}:/tmp/.env.sops:ro"
+		# Mount individual secret files instead of SOPS template
+		"${config.sops.secrets."pterodactyl/app_key".path}:/run/secrets/pterodactyl_app_key:ro"
+		"${config.sops.secrets."pterodactyl/db_password".path}:/run/secrets/pterodactyl_db_password:ro"
 		"${config.sops.secrets."pterodactyl/admin_password".path}:/run/secrets/admin_password:ro"
 		"${panelEntrypoint}:/entrypoint.sh:ro"
-	  ];
-	  entrypoint = "/bin/sh";
-	  cmd = [ "/entrypoint.sh" ];
-	  dependsOn = [ "pterodactyl-db" "pterodactyl-redis" ];
+	];
+	entrypoint = "/bin/sh";
+	cmd = [ "/entrypoint.sh" ];
+	dependsOn = [ "pterodactyl-db" "pterodactyl-redis" ];
 	};
 
 	# --- Worker ---
 	pterodactyl-worker = {
-	  image = images.panel;
-	  extraOptions = [ "--network=${podmanNetwork}" ];
-	  volumes = [
+	image = images.panel;
+	extraOptions = [ "--network=${podmanNetwork}" ];
+	volumes = [
 		"${dataDir}/var:/app/var"
 		"${dataDir}/logs:/app/storage/logs"
-		"${config.sops.templates."pterodactyl-panel.env".path}:/tmp/.env.sops:ro"
+		"${config.sops.secrets."pterodactyl/app_key".path}:/run/secrets/pterodactyl_app_key:ro"
+		"${config.sops.secrets."pterodactyl/db_password".path}:/run/secrets/pterodactyl_db_password:ro"
 		"${workerEntrypoint}:/entrypoint.sh:ro"
-	  ];
-	  entrypoint = "/bin/sh";
-	  cmd = [ "/entrypoint.sh" ];
-	  dependsOn = [ "pterodactyl-panel" ];
+	];
+	entrypoint = "/bin/sh";
+	cmd = [ "/entrypoint.sh" ];
+	dependsOn = [ "pterodactyl-panel" ];
 	};
+
 
 	# --- Wings ---
 	pterodactyl-wings = {
