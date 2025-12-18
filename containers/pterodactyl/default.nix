@@ -164,7 +164,6 @@ in {
 		sftp = { bind_port = 2022; };
 	  };
 
-	  # --- ADD THIS DOCKER BLOCK ---
       docker = {
         network = {
           name = "pterodactyl_nw";
