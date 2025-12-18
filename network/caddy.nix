@@ -138,11 +138,11 @@ in
       };
 
       /*
-        Service:  Jexactyl Panel and Node (Game Server Management)
-                  Jexactyl panel for managing game servers.
+        Service:  Pterodactyl Panel and Node (Game Server Management)
+                  Pterodactyl panel for managing game servers.
 
-                  panel.tongatime.us -> Jexactyl Panel
-                  node.tongatime.us -> Jexactyl Node (Wings)
+                  panel.tongatime.us -> Pterodactyl Panel
+                  node.tongatime.us -> Pterodactyl Node (Wings)
       */
       "panel.${domain}" = {
         useACMEHost = domain;
