@@ -286,12 +286,12 @@ in {
       extraOptions = [ "--privileged" "--network=host" ];
       
       volumes = [
-      "/var/run/docker.sock:/var/run/docker.sock"
-      "/var/lib/pterodactyl:/var/lib/pterodactyl" 
-      "/var/log/pterodactyl-wings:/var/log/pterodactyl"
-      "/etc/pterodactyl-wings:/etc/pterodactyl" 
-      "/tmp/pterodactyl-wings:/tmp/pterodactyl"
-    ];
+        "/var/run/docker.sock:/var/run/docker.sock"
+        "/var/lib/pterodactyl:/var/lib/pterodactyl" 
+        "/tmp/pterodactyl:/tmp/pterodactyl"
+        "/var/log/pterodactyl-wings:/var/log/pterodactyl"
+        "/etc/pterodactyl-wings:/etc/pterodactyl" 
+      	];
       
       environment = {
         TZ = "UTC";
@@ -312,7 +312,7 @@ in {
     "d ${dataDir}/logs 0755 33 33 - -"
     "d /var/lib/pterodactyl/volumes 0700 0 0 - -"
     "d /var/log/pterodactyl-wings 0700 0 0 - -"
-    "d /tmp/pterodactyl-wings 0700 0 0 - -"
+    "d /tmp/pterodactyl 0700 0 0 - -"
     "d /etc/pterodactyl-wings 0700 0 0 - -"
   ];
 
